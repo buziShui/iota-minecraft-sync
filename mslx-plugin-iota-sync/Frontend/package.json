@@ -1,0 +1,32 @@
+{
+  "name": "mslx-plugin-iota-sync",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "build:watch": "vite build --watch",
+    "preview": "vite preview --port 5001 --strictPort",
+    "dev:plugin": "concurrently -n \"BUILD,SERVE\" -c \"blue,green\" \"pnpm build:watch\" \"pnpm preview\""
+  },
+  "dependencies": {
+    "vue": "^3.5.32"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "@vue/tsconfig": "^0.9.1",
+    "concurrently": "^9.2.1",
+    "less": "^4.6.4",
+    "tdesign-icons-vue-next": "^0.4.4",
+    "tdesign-vue-next": "^1.19.1",
+    "typescript": "~6.0.2",
+    "unocss": "^66.6.8",
+    "unplugin-vue-components": "^32.0.0",
+    "vite": "^7.3.2",
+    "vite-plugin-css-injected-by-js": "^5.0.1",
+    "vite-plugin-external": "^6.2.2",
+    "vue-tsc": "^3.2.7"
+  }
+}

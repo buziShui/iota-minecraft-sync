@@ -1,0 +1,47 @@
+# MSLX Iota 客户端同步插件
+
+适配 MSLX 1.4.7，目标运行环境为 Linux x86_64。插件 ID：`mslx-plugin-iota-sync`。
+
+## 构建
+
+需要 .NET 10 SDK 与 Node.js。前端必须先构建，因为产物会嵌入插件 DLL：
+
+```bash
+cd Frontend
+corepack pnpm install
+corepack pnpm build
+cd ..
+dotnet build MSLX.Plugin.IotaSync.csproj -c Release
+```
+
+产物：`bin/Release/net10.0/MSLX.Plugin.IotaSync.dll`。在 MSLX 的插件管理页面上传该 DLL，然后重启 MSLX。
+
+## 使用流程
+
+1. 打开“客户端同步”。第一次打开时，插件会对所有已停止实例自动扫描一次。
+2. 为实例填写 Minecraft 版本、加载器、加载器版本和玩家实际使用的服务器地址。
+3. 勾选需要同步的目录。默认只有 `mods`；也可选择 `config`、`defaultconfigs`、`kubejs`、资源包和光影包。
+4. 停止 Minecraft 实例，点击“刷新扫描”。运行中的实例禁止扫描和发布。
+5. 检查自动识别结果，把全部“待人工确认”文件改为客户端必需、可选或仅服务端。
+6. 点击发布。发布内容复制为不可变快照，每个实例保留最近 5 个版本。
+7. 为每位玩家单独创建一个长期同步码。原始同步码只显示一次，服务端仅保存 PBKDF2 加盐哈希。
+8. 将 PassNat 的 HTTP 映射地址和同步码交给玩家。
+
+## PassNat
+
+映射 MSLX Web/API 所在端口。客户端请求路径统一位于：
+
+```text
+/api/plugins/mslx-plugin-iota-sync/sync/
+```
+
+同步码通过 `X-Iota-Sync-Code` 请求头发送。纯 HTTP 无法防止同网络中的旁路监听；本系统仍使用 SHA-256 阻止下载损坏，但 SHA-256 不能代替 HTTPS 的身份认证。
+
+## API 摘要
+
+- `GET sync/source`：验证同步源并返回绑定实例。
+- `GET sync/manifest`：取得最新发布清单。
+- `GET sync/files/{path}`：下载快照文件，支持 HTTP Range。
+- `GET sync/launcher`、`GET sync/launcher/file`：PCL IO 正式版更新。
+
+管理 API 全部要求 MSLX `admin` 角色；同步 API 使用实例独立的长期同步码。

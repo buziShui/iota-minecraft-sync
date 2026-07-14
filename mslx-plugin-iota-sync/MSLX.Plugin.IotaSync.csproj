@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+    <OutputType>Library</OutputType>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="10.0.7" />
+    <PackageReference Include="MSLX.SDK" Version="1.4.4-dev.20260519.2327" />
+  </ItemGroup>
+  <ItemGroup><Content Remove="Frontend\**" /><None Remove="Frontend\**" /><None Include="Frontend\**"><CopyToOutputDirectory>Never</CopyToOutputDirectory></None><EmbeddedResource Include="Frontend\dist\**\*" /></ItemGroup>
+</Project>

@@ -1,0 +1,20 @@
+# Build and dependency caches
+**/bin/
+**/obj/
+**/node_modules/
+**/.vs/
+**/*.user
+**/*.suo
+
+# Local runtime state and secrets
+**/IotaSync.json
+**/.iota-sync-state.json
+**/.iota-backup/
+**/*.iota-downloading
+**/.minecraft/
+**/PCL/Log*.txt
+**/PCL/Setup.ini
+dist/.minecraft/
+dist/PCL/
+
+# Keep intentionally packaged release artifacts in /dist.
