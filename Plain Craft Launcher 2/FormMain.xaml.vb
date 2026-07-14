@@ -1190,6 +1190,7 @@ Public Class FormMain
         SetupLink = 1
         SetupUI = 2
         SetupSystem = 3
+        SetupIota = 4
         LinkMain = 0
         OtherHelp = 0
         OtherAbout = 1

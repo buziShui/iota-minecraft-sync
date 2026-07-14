@@ -1,0 +1,23 @@
+<local:MyPageRight xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PCL" x:Class="PageSetupIota" PanScroll="PanBack">
+    <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
+        <StackPanel Margin="25,25,25,10">
+            <local:MyCard Margin="0,0,0,15" Title="客户端同步">
+                <StackPanel Margin="25,40,25,25">
+                    <TextBlock Text="为不同服务器保存独立的同步地址与长期同步码。选择对应游戏版本启动时，PCL IO 会检查服务器正式版本并同步差异。" TextWrapping="Wrap" Margin="0,0,0,15" />
+                    <StackPanel Orientation="Horizontal">
+                        <local:MyButton x:Name="BtnAdd" Text="添加同步源" Padding="16,8" ColorType="Highlight" Margin="0,0,10,0" />
+                        <local:MyButton x:Name="BtnRefresh" Text="刷新列表" Padding="16,8" />
+                    </StackPanel>
+                </StackPanel>
+            </local:MyCard>
+            <local:MyCard Margin="0,0,0,15" Title="已保存的同步源">
+                <StackPanel x:Name="PanSources" Margin="25,40,25,25" />
+            </local:MyCard>
+            <local:MyCard Margin="0,0,0,15" Title="同步行为">
+                <StackPanel Margin="25,40,25,25">
+                    <TextBlock Text="• 启动与同步源同名的游戏实例时自动检查一次。&#xa;• 服务端更新后可重新启动游戏触发检查，不在后台持续轮询。&#xa;• 玩家自行添加的未知 Mod 会保留。&#xa;• 被覆盖的文件会备份到实例的 .iota-backup 目录。&#xa;• 可选内容的选择会保存在本机，可在来源卡片中重置。" TextWrapping="Wrap" LineHeight="24" />
+                </StackPanel>
+            </local:MyCard>
+        </StackPanel>
+    </local:MyScrollViewer>
+</local:MyPageRight>

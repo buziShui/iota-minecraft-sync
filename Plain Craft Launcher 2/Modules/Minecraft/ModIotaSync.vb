@@ -3,21 +3,44 @@ Imports System.Security.Cryptography
 Imports Newtonsoft.Json.Linq
 
 Public Module ModIotaSync
-    Public Const IotaLauncherVersion As String = "0.1.0"
+    Public Const IotaLauncherVersion As String = "1.0.1"
     Private ReadOnly ConfigPath As String = Paths.Base & "PCL\IotaSync.json"
+    Private ReadOnly ConfigLock As New Object
 
     Public Function LoadSources() As JArray
-        Try
-            If File.Exists(ConfigPath) Then Return JArray.Parse(File.ReadAllText(ConfigPath))
-        Catch ex As Exception
-            Logger.Warn(ex, "读取 Iota 同步源失败")
-        End Try
-        Return New JArray()
+        SyncLock ConfigLock
+            Try
+                If File.Exists(ConfigPath) Then Return JArray.Parse(File.ReadAllText(ConfigPath))
+            Catch ex As Exception
+                Logger.Warn(ex, "读取 Iota 同步源失败")
+            End Try
+            Return New JArray()
+        End SyncLock
     End Function
 
-    Private Sub SaveSources(sources As JArray)
-        Directory.CreateDirectory(IO.Path.GetDirectoryName(ConfigPath))
-        File.WriteAllText(ConfigPath, sources.ToString(Newtonsoft.Json.Formatting.Indented))
+    Public Sub SaveSources(sources As JArray)
+        SyncLock ConfigLock
+            Directory.CreateDirectory(IO.Path.GetDirectoryName(ConfigPath))
+            Dim temp = ConfigPath & ".new"
+            File.WriteAllText(temp, sources.ToString(Newtonsoft.Json.Formatting.Indented))
+            If File.Exists(ConfigPath) Then File.Replace(temp, ConfigPath, Nothing) Else File.Move(temp, ConfigPath)
+        End SyncLock
+    End Sub
+
+    Public Function NormalizeSourceAddress(address As String) As String
+        address = address.Trim()
+        If Not address.Contains("://") Then address = "http://" & address
+        Dim uri As Uri = Nothing
+        If Not Uri.TryCreate(address, UriKind.Absolute, uri) OrElse (uri.Scheme <> Uri.UriSchemeHttp AndAlso uri.Scheme <> Uri.UriSchemeHttps) Then Throw New Exception("同步地址必须是有效的 HTTP 或 HTTPS 绝对地址")
+        Return address.TrimEnd("/"c)
+    End Function
+
+    Public Sub RemoveSource(instanceId As String)
+        Dim sources = LoadSources()
+        For i = sources.Count - 1 To 0 Step -1
+            If sources(i)("instanceId")?.ToString() = instanceId Then sources.RemoveAt(i)
+        Next
+        SaveSources(sources)
     End Sub
 
     Public Sub AddSourceInteractive()
@@ -26,9 +49,13 @@ Public Module ModIotaSync
         Dim code = MyMsgBoxInput("添加同步源", "请输入长期同步码。同步码只保存在本机。", "", New ObjectModel.Collection(Of Validate))
         If String.IsNullOrWhiteSpace(code) Then Return
         Try
+            address = NormalizeSourceAddress(address)
             Dim info = RequestJson(address, code, "source")
             Dim sources = LoadSources()
-            sources.Add(New JObject From {{"address", address.TrimEnd("/"c)}, {"code", code}, {"instanceId", info("instanceId")}, {"instanceName", info("instanceName")}})
+            For i = sources.Count - 1 To 0 Step -1
+                If sources(i)("instanceId")?.ToString() = info("instanceId")?.ToString() Then sources.RemoveAt(i)
+            Next
+            sources.Add(New JObject From {{"address", address}, {"code", code}, {"instanceId", info("instanceId")}, {"instanceName", info("instanceName")}})
             SaveSources(sources)
             Dim manifest = RequestJson(address, code, "manifest")
             Dim instanceName = info("instanceName").ToString(), versionFolder = McFolderSelected & "versions\" & instanceName & "\"

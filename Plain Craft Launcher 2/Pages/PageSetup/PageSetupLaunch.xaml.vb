@@ -1,12 +1,4 @@
 Public Class PageSetupLaunch
-    Private Sub BtnIotaAddSource_Click() Handles BtnIotaAddSource.Click
-        AddSourceInteractive()
-    End Sub
-
-    Private Sub BtnIotaManageSource_Click() Handles BtnIotaManageSource.Click
-        ManageSourcesInteractive()
-    End Sub
-
     Private Sub PageSetupLaunch_Loaded(sender As Object, e As RoutedEventArgs) Handles Me.Loaded
         '重复加载部分
         PanBack.ScrollToHome()
