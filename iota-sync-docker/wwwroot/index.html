@@ -1,12 +1,46 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Iota Sync 管理</title><link rel="stylesheet" href="/style.css"></head>
-<body><header><h1>Iota Sync</h1><span>独立 Docker 同步管理</span><button id="logout" class="ghost">退出</button></header>
-<main>
-  <section id="login" class="card narrow"><h2>管理员登录</h2><p>输入部署时设置的管理员令牌。</p><input id="token" type="password" placeholder="IOTA_ADMIN_TOKEN"><button onclick="login()">登录</button></section>
-  <div id="app" hidden>
-    <div class="notice">扫描和发布前请先停止 Minecraft 服务端。独立容器无法自动判断宿主机进程状态，需要管理员手动确认。</div>
-    <section class="card"><h2>添加服务端实例</h2><div class="row"><input id="newName" placeholder="实例名称，如：朋友服"><input id="newPath" placeholder="容器内目录，如：/servers/friends"><button onclick="addInstance()">添加</button></div></section>
-    <section class="card"><div class="title"><h2>服务端实例</h2><button class="ghost" onclick="loadAll()">刷新</button></div><div id="instances"></div></section>
-    <section class="card"><h2>同步码</h2><div id="codes"></div></section>
-    <section class="card"><h2>发布 PCL IO 客户端更新</h2><div class="row"><input id="launcherVersion" placeholder="版本号"><input id="launcherNotes" placeholder="更新说明"><input id="launcherFile" type="file" accept=".exe"><button onclick="uploadLauncher()">上传正式版</button></div></section>
-  </div>
-</main><div id="toast"></div><script src="/app.js"></script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <title>Iota Sync · 同步控制台</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Iota Sync 首页"><span class="brand-mark">I</span><span><b>Iota Sync</b><small>DOCKER CONSOLE</small></span></a>
+    <div class="top-actions"><span class="live"><i></i> 服务在线</span><button id="logout" class="btn btn-quiet" hidden>退出登录</button></div>
+  </header>
+  <main>
+    <section id="login" class="login-shell">
+      <div class="login-art"><span class="eyebrow">PRIVATE CLOUD</span><h1>让每一次更新<br><em>都准确抵达。</em></h1><p>独立、安全、可追溯的 Minecraft 客户端同步中心。</p><div class="orb"><span></span></div></div>
+      <div class="login-card panel"><div class="icon-tile">⌁</div><span class="eyebrow">WELCOME BACK</span><h2>管理员登录</h2><p>使用部署时生成的管理员令牌进入控制台。</p><label class="field"><span>管理员令牌</span><input id="token" type="password" placeholder="输入 IOTA_ADMIN_TOKEN" autocomplete="current-password"></label><button class="btn btn-primary btn-wide" onclick="login()">进入控制台 <span>→</span></button><small class="safe-note">令牌仅保存在当前浏览器中</small></div>
+    </section>
+    <div id="app" hidden>
+      <section class="hero"><div><span class="eyebrow">SYNC OPERATIONS</span><h1>客户端同步中心</h1><p>集中管理实例、版本快照与玩家访问权限。</p></div><button class="btn btn-quiet" onclick="loadAll()"><span class="spin-icon">↻</span> 刷新数据</button></section>
+      <section class="metrics">
+        <article class="metric metric-purple"><span class="metric-icon">◫</span><div><strong id="metricInstances">0</strong><small>服务端实例</small></div><i>INSTANCES</i></article>
+        <article class="metric metric-cyan"><span class="metric-icon">◇</span><div><strong id="metricReleases">0</strong><small>正式版本</small></div><i>RELEASES</i></article>
+        <article class="metric metric-green"><span class="metric-icon">⌁</span><div><strong id="metricCodes">0</strong><small>有效同步码</small></div><i>ACCESS</i></article>
+        <article class="metric metric-orange"><span class="metric-icon">⬡</span><div><strong>5</strong><small>快照保留上限</small></div><i>RETENTION</i></article>
+      </section>
+      <aside class="notice"><span>!</span><div><b>发布前安全检查</b><p>独立容器无法自动判断宿主机进程状态。扫描和发布前，请先停止对应的 Minecraft 服务端。</p></div></aside>
+      <section class="workspace-grid">
+        <div class="main-column">
+          <section class="panel section-card"><div class="section-head"><div><span class="eyebrow">SERVERS</span><h2>服务端实例</h2></div><button class="btn btn-primary" onclick="toggleAdd()">＋ 添加实例</button></div>
+            <div id="addPanel" class="add-panel" hidden><div class="subhead"><b>连接服务端目录</b><button class="icon-btn" onclick="toggleAdd()">×</button></div><div class="form-two"><label class="field"><span>实例名称</span><input id="newName" placeholder="例如：机械动力生存服"></label><label class="field"><span>容器内目录</span><input id="newPath" placeholder="例如：/servers/5"></label></div><button class="btn btn-primary" onclick="addInstance()">确认添加</button></div>
+            <div id="instances" class="instance-list"></div>
+          </section>
+        </div>
+        <aside class="side-column">
+          <section class="panel section-card sticky"><div class="section-head compact"><div><span class="eyebrow">ACCESS</span><h2>同步码</h2></div><span id="codeCount" class="count-badge">0</span></div><div id="codes" class="code-list"></div></section>
+          <section class="panel section-card"><div class="section-head compact"><div><span class="eyebrow">LAUNCHER</span><h2>PCL IO 更新</h2></div></div><p class="section-desc">向所有已授权客户端发布启动器正式版。</p><label class="field"><span>版本号</span><input id="launcherVersion" placeholder="例如：1.1.0"></label><label class="field"><span>更新说明</span><textarea id="launcherNotes" placeholder="本次版本的主要变化"></textarea></label><label class="file-drop"><input id="launcherFile" type="file" accept=".exe"><span>↑</span><b>选择 EXE 文件</b><small>最大 200 MB</small></label><button class="btn btn-primary btn-wide" onclick="uploadLauncher()">发布客户端更新</button></section>
+        </aside>
+      </section>
+    </div>
+  </main>
+  <div id="toast" role="status"><span></span><p></p></div>
+  <script src="/app.js"></script>
+</body></html>
