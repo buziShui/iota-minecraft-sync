@@ -391,6 +391,7 @@ EndHint:
     Public FrmSetupUI As PageSetupUI
     Public FrmSetupSystem As PageSetupSystem
     Public FrmSetupLink As PageSetupLink
+    Public FrmSetupIota As PageSetupIota
 
     '其他页面声明
     Public FrmOtherLeft As PageOtherLeft

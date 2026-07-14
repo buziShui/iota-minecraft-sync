@@ -58,7 +58,7 @@ Public Class PageSetupLeft
     ''' <summary>
     ''' 勾选事件改变页面。
     ''' </summary>
-    Private Sub PageCheck(sender As MyListItem, e As EventArgs) Handles ItemLaunch.Check, ItemSystem.Check, ItemUI.Check, ItemLink.Check
+    Private Sub PageCheck(sender As MyListItem, e As EventArgs) Handles ItemLaunch.Check, ItemIota.Check, ItemSystem.Check, ItemUI.Check, ItemLink.Check
         '尚未初始化控件属性时，sender.Tag 为 Nothing，会跳过切换，且由于 PageID 默认为 0 而切换到第一个页面
         '若使用 IsLoaded，则会导致模拟点击不被执行（模拟点击切换页面时，控件的 IsLoaded 为 False）
         If sender.Tag IsNot Nothing Then PageChange(Val(sender.Tag))
@@ -73,6 +73,9 @@ Public Class PageSetupLeft
             Case FormMain.PageSubType.SetupLaunch
                 If FrmSetupLaunch Is Nothing Then FrmSetupLaunch = New PageSetupLaunch
                 Return FrmSetupLaunch
+            Case FormMain.PageSubType.SetupIota
+                If FrmSetupIota Is Nothing Then FrmSetupIota = New PageSetupIota
+                Return FrmSetupIota
             Case FormMain.PageSubType.SetupUI
                 If FrmSetupUI Is Nothing Then FrmSetupUI = New PageSetupUI
                 Return FrmSetupUI
@@ -100,6 +103,9 @@ Public Class PageSetupLeft
                 Case FormMain.PageSubType.SetupLaunch
                     If IsNothing(FrmSetupLaunch) Then FrmSetupLaunch = New PageSetupLaunch
                     PageChangeRun(FrmSetupLaunch)
+                Case FormMain.PageSubType.SetupIota
+                    If IsNothing(FrmSetupIota) Then FrmSetupIota = New PageSetupIota
+                    PageChangeRun(FrmSetupIota)
                 Case FormMain.PageSubType.SetupUI
                     If IsNothing(FrmSetupUI) Then FrmSetupUI = New PageSetupUI
                     PageChangeRun(FrmSetupUI)

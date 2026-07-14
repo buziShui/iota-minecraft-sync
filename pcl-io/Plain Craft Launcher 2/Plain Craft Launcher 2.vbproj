@@ -379,6 +379,9 @@
     <Compile Include="Pages\PageSetup\PageSetupLaunch.xaml.vb">
       <DependentUpon>PageSetupLaunch.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Pages\PageSetup\PageSetupIota.xaml.vb">
+      <DependentUpon>PageSetupIota.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Pages\PageSetup\PageSetupSystem.xaml.vb">
       <DependentUpon>PageSetupSystem.xaml</DependentUpon>
     </Compile>
@@ -630,6 +633,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Pages\PageSetup\PageSetupLaunch.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Pages\PageSetup\PageSetupIota.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

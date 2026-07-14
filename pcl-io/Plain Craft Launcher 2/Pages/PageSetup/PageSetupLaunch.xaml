@@ -7,15 +7,6 @@
     PanScroll="PanBack">
     <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
         <StackPanel x:Name="PanMain" Margin="25,25,25,10">
-            <local:MyCard Margin="0,0,0,15" Title="PCL IO 客户端同步">
-                <StackPanel Margin="25,40,25,25">
-                    <TextBlock Text="添加 MSLX 同步地址与长期同步码。启动对应游戏实例前会自动检查、备份并同步。" TextWrapping="Wrap" Margin="0,0,0,12" />
-                    <StackPanel Orientation="Horizontal">
-                        <local:MyButton x:Name="BtnIotaAddSource" Text="添加同步源" Padding="16,8" ColorType="Highlight" Margin="0,0,10,0" />
-                        <local:MyButton x:Name="BtnIotaManageSource" Text="管理同步源" Padding="16,8" />
-                    </StackPanel>
-                </StackPanel>
-            </local:MyCard>
             <local:MyCard x:Name="CardArgument" Margin="0,0,0,15" Title="启动选项">
                 <StackPanel Margin="25,40,25,25">
                     <Grid>
