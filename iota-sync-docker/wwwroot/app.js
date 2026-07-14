@@ -1,9 +1,9 @@
 let instances=[],codes=[];const dirs=['mods','config','defaultconfigs','kubejs','resourcepacks','shaderpacks'];
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toast(msg,error=false){const x=$('toast');x.querySelector('p').textContent=msg;x.querySelector('span').style.background=error?'var(--danger)':'var(--green)';x.style.display='flex';clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>x.style.display='none',4200)}
-async function api(url,opt={}){opt.headers={...(opt.headers||{}),'X-Iota-Admin-Token':localStorage.iotaAdmin||''};const r=await fetch(url,opt);if(!r.ok)throw Error(await r.text());return r.status===204?null:r.json()}
-async function login(){localStorage.iotaAdmin=$('token').value;try{await loadAll();$('login').hidden=true;$('app').hidden=false;$('logout').hidden=false}catch(e){delete localStorage.iotaAdmin;toast(e.message,true)}}
-$('token').addEventListener('keydown',e=>{if(e.key==='Enter')login()});$('logout').onclick=()=>{delete localStorage.iotaAdmin;location.reload()};
+async function api(url,opt={}){opt.headers={...(opt.headers||{}),'X-Iota-Admin-Token':localStorage.getItem('iotaAdmin')||''};const r=await fetch(url,opt);if(!r.ok)throw Error(await r.text());return r.status===204?null:r.json()}
+async function login(useSaved=false){const entered=$('token').value.trim();if(!useSaved){if(!entered)return toast('请输入管理员令牌',true);localStorage.setItem('iotaAdmin',entered)}const saved=localStorage.getItem('iotaAdmin');if(!saved)return;try{await loadAll();$('login').hidden=true;$('app').hidden=false;$('logout').hidden=false}catch(e){if(!useSaved)localStorage.removeItem('iotaAdmin');toast(e.message,true)}}
+$('token').addEventListener('keydown',e=>{if(e.key==='Enter')login()});$('logout').onclick=()=>{localStorage.removeItem('iotaAdmin');location.reload()};
 function toggleAdd(){$('addPanel').hidden=!$('addPanel').hidden;if(!$('addPanel').hidden)$('newName').focus()}
 async function loadAll(){try{[instances,codes]=await Promise.all([api('/api/admin/instances'),api('/api/admin/codes')]);render()}catch(e){toast(e.message,true);throw e}}
 async function addInstance(){if(!$('newName').value.trim()||!$('newPath').value.trim())return toast('请填写实例名称和容器内目录',true);try{await api('/api/admin/instances',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:$('newName').value,rootPath:$('newPath').value})});$('newName').value=$('newPath').value='';toggleAdd();toast('实例已连接');await loadAll()}catch(e){toast(e.message,true)}}
@@ -29,4 +29,4 @@ async function createCode(id){const name=prompt('同步码备注（建议填写�
 async function revoke(id){if(confirm('确定撤销此同步码？')){try{await api(`/api/admin/codes/${id}`,{method:'DELETE'});toast('同步码已撤销');await loadAll()}catch(e){toast(e.message,true)}}}
 async function removeInstance(id){if(confirm('删除实例配置？已发布快照不会自动删除。')){try{await api(`/api/admin/instances/${id}`,{method:'DELETE'});toast('实例配置已删除');await loadAll()}catch(e){toast(e.message,true)}}}
 async function uploadLauncher(){const f=$('launcherFile').files[0];if(!f)return toast('请选择 EXE 文件',true);if(!$('launcherVersion').value.trim())return toast('请填写版本号',true);const body=new FormData();body.append('version',$('launcherVersion').value);body.append('notes',$('launcherNotes').value);body.append('file',f);try{await api('/api/admin/launcher',{method:'POST',body});toast('PCL IO 正式版已发布')}catch(e){toast(e.message,true)}}
-if(localStorage.iotaAdmin)login();
+if(localStorage.getItem('iotaAdmin'))login(true);
