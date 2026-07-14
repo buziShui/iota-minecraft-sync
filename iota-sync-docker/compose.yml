@@ -1,0 +1,17 @@
+services:
+  iota-sync:
+    build:
+      context: ..
+      dockerfile: iota-sync-docker/Dockerfile
+    image: iota-sync:1.0.0
+    container_name: iota-sync
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: Asia/Shanghai
+      IOTA_ADMIN_TOKEN: "${IOTA_ADMIN_TOKEN:?请先在 .env 中设置管理员令牌}"
+    volumes:
+      - ./data:/data
+      # 按实际路径增加只读挂载；冒号右侧是管理页中填写的容器内目录。
+      - /opt/minecraft/friends:/servers/friends:ro

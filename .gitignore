@@ -7,6 +7,7 @@
 **/*.suo
 
 # Local runtime state and secrets
+**/.env
 **/IotaSync.json
 **/.iota-sync-state.json
 **/.iota-backup/

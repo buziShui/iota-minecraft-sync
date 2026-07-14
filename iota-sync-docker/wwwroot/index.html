@@ -1,0 +1,12 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Iota Sync 管理</title><link rel="stylesheet" href="/style.css"></head>
+<body><header><h1>Iota Sync</h1><span>独立 Docker 同步管理</span><button id="logout" class="ghost">退出</button></header>
+<main>
+  <section id="login" class="card narrow"><h2>管理员登录</h2><p>输入部署时设置的管理员令牌。</p><input id="token" type="password" placeholder="IOTA_ADMIN_TOKEN"><button onclick="login()">登录</button></section>
+  <div id="app" hidden>
+    <div class="notice">扫描和发布前请先停止 Minecraft 服务端。独立容器无法自动判断宿主机进程状态，需要管理员手动确认。</div>
+    <section class="card"><h2>添加服务端实例</h2><div class="row"><input id="newName" placeholder="实例名称，如：朋友服"><input id="newPath" placeholder="容器内目录，如：/servers/friends"><button onclick="addInstance()">添加</button></div></section>
+    <section class="card"><div class="title"><h2>服务端实例</h2><button class="ghost" onclick="loadAll()">刷新</button></div><div id="instances"></div></section>
+    <section class="card"><h2>同步码</h2><div id="codes"></div></section>
+    <section class="card"><h2>发布 PCL IO 客户端更新</h2><div class="row"><input id="launcherVersion" placeholder="版本号"><input id="launcherNotes" placeholder="更新说明"><input id="launcherFile" type="file" accept=".exe"><button onclick="uploadLauncher()">上传正式版</button></div></section>
+  </div>
+</main><div id="toast"></div><script src="/app.js"></script></body></html>
