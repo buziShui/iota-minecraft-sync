@@ -91,6 +91,7 @@ app.MapDelete("/api/admin/codes/{codeId}", (string codeId, SyncStore store) =>
 {
     var code = store.State.Codes.FirstOrDefault(x => x.Id == codeId); if (code is null) return Results.NotFound(); code.Enabled = false; store.Save(); return Results.NoContent();
 });
+app.MapGet("/api/admin/launcher", (SyncStore store) => Results.Ok(store.State.Launcher));
 app.MapPost("/api/admin/launcher", async (HttpRequest request, SyncStore store) =>
 {
     var form = await request.ReadFormAsync(); var file = form.Files["file"]; var version = form["version"].ToString();
