@@ -8,30 +8,38 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 
 class ApiError extends Error{constructor(status,message){super(message);this.status=status}}
 async function api(url,opt={}){
-  opt.headers={...(opt.headers||{}),'X-Iota-Admin-Token':localStorage.getItem('iotaAdmin')||''};
   const response=await fetch(url,opt),contentType=response.headers.get('content-type')||'';
   const value=response.status===204?null:contentType.includes('json')?await response.json():await response.text();
-  if(!response.ok)throw new ApiError(response.status,typeof value==='string'?value:(value?.title||'请求失败'));
+  if(!response.ok)throw new ApiError(response.status,typeof value==='string'?value:(value?.message||value?.title||'请求失败'));
   return value;
 }
 function toast(message,error=false){const el=$('toast');el.querySelector('p').textContent=message;el.querySelector('span').style.background=error?'var(--red)':'var(--green)';el.hidden=false;clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>el.hidden=true,4000)}
-function toggleToken(button){const input=$('token'),show=input.type==='password';input.type=show?'text':'password';button.textContent=show?'隐藏':'查看'}
-async function login(useSaved=false){
-  const entered=$('token').value.trim();
-  if(!useSaved){if(!entered)return toast('请输入管理员令牌',true);localStorage.setItem('iotaAdmin',entered)}
-  if(!localStorage.getItem('iotaAdmin'))return;
-  try{await loadAll();$('login').hidden=true;$('app').hidden=false}
-  catch(error){if(error.status===401)localStorage.removeItem('iotaAdmin');$('login').hidden=false;$('app').hidden=true;toast(error.message,true)}
+function togglePassword(button){const input=$('adminPassword'),show=input.type==='password';input.type=show?'text':'password';button.textContent=show?'隐藏':'查看'}
+function showLogin(){ $('login').hidden=false;$('app').hidden=true }
+function showApp(){ $('login').hidden=true;$('app').hidden=false }
+async function login(){
+  const username=$('adminUsername').value.trim(),password=$('adminPassword').value;
+  if(!username||!password)return toast('请输入管理员账号和密码',true);
+  try{
+    await api('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+    $('adminPassword').value='';
+    await loadAll(null,true);showApp();
+  }catch(error){showLogin();toast(error.message,true)}
 }
-$('logout').onclick=()=>{localStorage.removeItem('iotaAdmin');location.reload()};
+$('logout').onclick=async()=>{try{await api('/api/admin/logout',{method:'POST'})}finally{location.reload()}};
 
-async function loadAll(button){
+async function restoreSession(){
+  try{await loadAll(null,true);showApp()}
+  catch(error){showLogin();if(error.status!==401)toast(error.message,true)}
+}
+
+async function loadAll(button,silent=false){
   if(button)button.disabled=true;
   try{
     [instances,codes,launcher]=await Promise.all([api('/api/admin/instances'),api('/api/admin/codes'),api('/api/admin/launcher')]);
     if(selectedInstanceId===null||!instances.some(x=>x.instanceId===selectedInstanceId))selectedInstanceId=instances[0]?.instanceId??null;
     renderAll();$('lastUpdated').textContent=`更新于 ${new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}`;
-  }catch(error){toast(error.message,true);throw error}finally{if(button)button.disabled=false}
+  }catch(error){if(!silent)toast(error.message,true);throw error}finally{if(button)button.disabled=false}
 }
 function renderAll(){renderMetrics();renderOverview();renderInstancePicker();renderInstanceWorkspace();renderCodes();renderLauncher();$('sourceUrl').textContent=syncSource()}
 function syncSource(){return `${location.origin}/api/plugins/mslx-plugin-iota-sync/sync`}
@@ -136,7 +144,7 @@ async function revokeCode(id){try{await api(`/api/admin/codes/${id}`,{method:'DE
 function renderLauncher(){const current=$('launcherCurrent');if(!current)return;if(!launcher){current.className='empty-state small';current.innerHTML='<span>↓</span><b>还没有客户端版本</b><p>在右侧上传首个 PCL IO 正式版。</p>';$('launcherBadge').textContent='未发布';$('launcherBadge').className='pill neutral';return}current.className='launcher-details';current.innerHTML=`<div class="version-hero"><span>↓</span><div><h3>PCL IO ${esc(launcher.version)}</h3><p>${formatDate(launcher.publishedAt)} 发布</p></div></div><div class="detail-list"><div><span>文件大小</span><b>${size(launcher.size)}</b></div><div><span>文件名</span><b>${esc(launcher.fileName)}</b></div><div style="grid-column:1/-1"><span>SHA-256</span><b>${esc(launcher.sha256)}</b></div></div><div class="release-notes">${esc(launcher.notes||'本次发布未填写更新说明')}</div>`;$('launcherBadge').textContent='正式版';$('launcherBadge').className='pill success'}
 function fileChosen(){const file=$('launcherFile').files[0];if(!file){$('fileName').textContent='选择 PCL IO EXE 文件';$('fileMeta').textContent='点击选择，最大 200 MB';return}$('fileName').textContent=file.name;$('fileMeta').textContent=`${size(file.size)} · 已准备上传`}
 async function uploadLauncher(){const file=$('launcherFile').files[0],version=$('launcherVersion').value.trim();if(!version)return toast('请填写客户端版本号',true);if(!file)return toast('请选择 EXE 文件',true);const data=new FormData();data.append('version',version);data.append('notes',$('launcherNotes').value.trim());data.append('file',file);const progress=$('uploadProgress');progress.hidden=false;progress.querySelector('span').style.width='0';try{launcher=await xhrUpload('/api/admin/launcher',data,p=>progress.querySelector('span').style.width=`${p}%`);progress.querySelector('span').style.width='100%';toast('PCL IO 正式版发布成功');$('launcherVersion').value=$('launcherNotes').value='';$('launcherFile').value='';fileChosen();renderLauncher();renderOverview()}catch(error){toast(error.message,true)}finally{setTimeout(()=>progress.hidden=true,700)}}
-function xhrUpload(url,data,onProgress){return new Promise((resolve,reject)=>{const xhr=new XMLHttpRequest();xhr.open('POST',url);xhr.setRequestHeader('X-Iota-Admin-Token',localStorage.getItem('iotaAdmin')||'');xhr.upload.onprogress=e=>{if(e.lengthComputable)onProgress(Math.round(e.loaded/e.total*100))};xhr.onload=()=>{let value;try{value=JSON.parse(xhr.responseText)}catch{value=xhr.responseText}xhr.status>=200&&xhr.status<300?resolve(value):reject(new ApiError(xhr.status,typeof value==='string'?value:'上传失败'))};xhr.onerror=()=>reject(new Error('网络连接中断'));xhr.send(data)})}
+function xhrUpload(url,data,onProgress){return new Promise((resolve,reject)=>{const xhr=new XMLHttpRequest();xhr.open('POST',url);xhr.upload.onprogress=e=>{if(e.lengthComputable)onProgress(Math.round(e.loaded/e.total*100))};xhr.onload=()=>{let value;try{value=JSON.parse(xhr.responseText)}catch{value=xhr.responseText}xhr.status>=200&&xhr.status<300?resolve(value):reject(new ApiError(xhr.status,typeof value==='string'?value:(value?.message||'上传失败')))};xhr.onerror=()=>reject(new Error('网络连接中断'));xhr.send(data)})}
 
 function openModal(kicker,title,body,actions){$('modalKicker').textContent=kicker;$('modalTitle').textContent=title;$('modalBody').innerHTML=body;$('modalActions').innerHTML=actions;$('modal').hidden=false}
 function closeModal(){$('modal').hidden=true}
@@ -146,4 +154,4 @@ function releaseDate(id){if(!/^\d{14}$/.test(id))return id;return `${id.slice(0,
 
 document.documentElement.dataset.theme=localStorage.getItem('iotaTheme')||'';
 const initialView=['overview','instances','codes','launcher'].includes(location.hash.slice(1))?location.hash.slice(1):'overview';showView(initialView);
-if(localStorage.getItem('iotaAdmin'))login(true);
+restoreSession();

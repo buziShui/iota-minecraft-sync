@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#171a2b">
   <title>Iota Sync · 管理中心</title>
-  <link rel="stylesheet" href="/style.css?v=20260716">
+  <link rel="stylesheet" href="/style.css?v=20260716a">
 </head>
 <body>
   <section id="login" class="login-page">
@@ -16,10 +16,11 @@
     </div>
     <div class="login-form-wrap">
       <form class="login-card" onsubmit="login();return false">
-        <span class="kicker">ADMIN CONSOLE</span><h2>欢迎回来</h2><p>输入部署时设置的管理员令牌。</p>
-        <label class="field"><span>管理员令牌</span><div class="input-action"><input id="token" type="password" placeholder="IOTA_ADMIN_TOKEN" autocomplete="current-password"><button type="button" aria-label="显示令牌" onclick="toggleToken(this)">查看</button></div></label>
+        <span class="kicker">ADMIN CONSOLE</span><h2>欢迎回来</h2><p>使用部署时设置的管理员账号登录。</p>
+        <label class="field"><span>管理员账号</span><input id="adminUsername" type="text" placeholder="请输入管理员账号" autocomplete="username" autofocus></label>
+        <label class="field"><span>管理员密码</span><div class="input-action"><input id="adminPassword" type="password" placeholder="请输入管理员密码" autocomplete="current-password"><button type="button" aria-label="显示密码" onclick="togglePassword(this)">查看</button></div></label>
         <button class="btn primary wide" type="submit">进入管理中心 <span>→</span></button>
-        <div class="privacy-note"><span class="status-dot"></span>令牌仅保存在当前浏览器</div>
+        <div class="privacy-note"><span class="status-dot"></span>登录状态通过安全 Cookie 保持</div>
       </form>
     </div>
   </section>
@@ -83,6 +84,6 @@
   <div id="sidebarMask" class="sidebar-mask" hidden onclick="toggleSidebar(false)"></div>
   <div id="modal" class="modal-backdrop" hidden><section class="modal"><header><div><span id="modalKicker" class="kicker">ACTION</span><h2 id="modalTitle"></h2></div><button class="icon-button" onclick="closeModal()">×</button></header><div id="modalBody"></div><footer id="modalActions"></footer></section></div>
   <div id="toast" role="status"><span></span><p></p><button onclick="this.parentElement.hidden=true">×</button></div>
-  <script src="/app.js?v=20260716"></script>
+  <script src="/app.js?v=20260716a"></script>
 </body>
 </html>

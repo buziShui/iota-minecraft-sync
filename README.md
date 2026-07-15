@@ -34,14 +34,15 @@ services:
       - "8080:8080"
     environment:
       TZ: Asia/Shanghai
-      IOTA_ADMIN_TOKEN: "${IOTA_ADMIN_TOKEN:?请先在 .env 中设置管理员令牌}"
+      IOTA_ADMIN_USERNAME: "${IOTA_ADMIN_USERNAME:?请先在 .env 中设置管理员账号}"
+      IOTA_ADMIN_PASSWORD: "${IOTA_ADMIN_PASSWORD:?请先在 .env 中设置管理员密码}"
     volumes:
       - ./data:/data
       - /opt/minecraft/friends:/servers/friends:ro
       - /opt/minecraft/modded:/servers/modded:ro
 ```
 
-冒号左侧是宿主机真实服务端目录，右侧是容器内路径。可按实例继续添加挂载。然后复制令牌模板并修改：
+冒号左侧是宿主机真实服务端目录，右侧是容器内路径。可按实例继续添加挂载。然后复制账号密码模板并修改：
 
 ```bash
 cp iota-sync-docker/.env.example iota-sync-docker/.env
@@ -56,7 +57,7 @@ docker compose -f iota-sync-docker/compose.yml up -d --build
 docker compose -f iota-sync-docker/compose.yml logs -f
 ```
 
-访问 `http://服务器IP:8080`，输入 `IOTA_ADMIN_TOKEN` 登录。
+访问 `http://服务器IP:8080`，输入 `.env` 中的 `IOTA_ADMIN_USERNAME` 和 `IOTA_ADMIN_PASSWORD` 登录。登录成功后服务端会签发 30 天有效的 HttpOnly Cookie，刷新页面无需重复输入密码；退出登录会立即清除 Cookie。
 
 ### 3. 添加和发布实例
 
@@ -83,7 +84,7 @@ docker compose -f iota-sync-docker/compose.yml logs -f
 
 将外部 TCP HTTP(S) 端口映射到 Docker 主机的 `8080`。若映射地址为 `http://example.passnat.com:12345`，玩家就填写该完整根地址。
 
-公网部署建议使用 Nginx、Caddy 或其他反向代理启用 HTTPS。纯 HTTP 会使管理员令牌或同步码存在旁路监听风险。
+公网部署建议使用 Nginx、Caddy 或其他反向代理启用 HTTPS。纯 HTTP 会使管理员密码或同步码存在旁路监听风险。
 
 ## 持久数据
 
@@ -120,8 +121,10 @@ docker build -f iota-sync-docker/Dockerfile -t iota-sync:1.0.0 .
 
 ## 安全建议
 
-- `IOTA_ADMIN_TOKEN` 至少 16 位，建议使用密码管理器生成的 32 位以上随机值。
-- 不要把真实令牌写入 Git；提交前应保留 Compose 中的占位符。
+- `IOTA_ADMIN_PASSWORD` 至少 12 位，建议使用密码管理器生成的 20 位以上随机强密码。
+- 不要把真实账号密码写入 Git；提交前应保留 Compose 中的占位符。
+- 管理端会话使用签名的 HttpOnly、SameSite=Strict Cookie；修改账号或密码并重启容器后，已有会话会自动失效。
+- 登录接口按来源限制为每分钟最多 5 次尝试。
 - 每位玩家使用独立同步码，以便单独撤销。
 - 管理页面和同步接口经公网访问时必须优先配置 HTTPS。
 - 只挂载需要扫描的服务端目录，且使用只读 `:ro`。

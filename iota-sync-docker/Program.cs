@@ -1,5 +1,8 @@
 using IotaSync.Docker;
 using Microsoft.AspNetCore.Http.Features;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -9,20 +12,121 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 });
 builder.Services.Configure<FormOptions>(x => x.MultipartBodyLengthLimit = 200_000_000);
 builder.Services.AddSingleton<SyncStore>();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("admin-login", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
+});
 var app = builder.Build();
-var adminToken = builder.Configuration["IOTA_ADMIN_TOKEN"];
-if (string.IsNullOrWhiteSpace(adminToken) || adminToken.Length < 16)
-    throw new InvalidOperationException("必须设置至少 16 个字符的 IOTA_ADMIN_TOKEN");
+const string adminCookieName = "iota_admin_session";
+var adminUsername = builder.Configuration["IOTA_ADMIN_USERNAME"]?.Trim();
+var adminPassword = builder.Configuration["IOTA_ADMIN_PASSWORD"];
+if (string.IsNullOrWhiteSpace(adminUsername))
+    throw new InvalidOperationException("必须设置 IOTA_ADMIN_USERNAME");
+if (string.IsNullOrWhiteSpace(adminPassword) || adminPassword.Length < 12)
+    throw new InvalidOperationException("必须设置至少 12 个字符的 IOTA_ADMIN_PASSWORD");
 
-app.UseDefaultFiles(); app.UseStaticFiles();
+var adminUsernameHash = SHA256.HashData(Encoding.UTF8.GetBytes(adminUsername));
+var adminPasswordHash = SHA256.HashData(Encoding.UTF8.GetBytes(adminPassword));
+var adminSessionKey = SHA256.HashData(Encoding.UTF8.GetBytes($"iota-admin-session-v1\n{adminUsername}\n{adminPassword}"));
+
+bool SecureCredentialEquals(string? supplied, byte[] expectedHash)
+{
+    var suppliedHash = SHA256.HashData(Encoding.UTF8.GetBytes(supplied ?? string.Empty));
+    return CryptographicOperations.FixedTimeEquals(suppliedHash, expectedHash);
+}
+
+string CreateSessionToken(DateTimeOffset expiresAt)
+{
+    var expiresUnix = expiresAt.ToUnixTimeSeconds();
+    var nonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
+    var payload = $"{adminUsername}\n{expiresUnix}\n{nonce}";
+    var signature = HMACSHA256.HashData(adminSessionKey, Encoding.UTF8.GetBytes(payload));
+    return $"{expiresUnix}.{nonce}.{Convert.ToHexString(signature).ToLowerInvariant()}";
+}
+
+bool IsSessionValid(string? token)
+{
+    if (string.IsNullOrWhiteSpace(token)) return false;
+    var parts = token.Split('.', 3);
+    if (parts.Length != 3 || parts[1].Length != 32 || parts[2].Length != 64 ||
+        !long.TryParse(parts[0], out var expiresUnix)) return false;
+
+    try
+    {
+        var now = DateTimeOffset.UtcNow;
+        var expiresAt = DateTimeOffset.FromUnixTimeSeconds(expiresUnix);
+        if (expiresAt <= now || expiresAt > now.AddDays(31)) return false;
+
+        var payload = $"{adminUsername}\n{expiresUnix}\n{parts[1]}";
+        var expected = HMACSHA256.HashData(adminSessionKey, Encoding.UTF8.GetBytes(payload));
+        var supplied = Convert.FromHexString(parts[2]);
+        return CryptographicOperations.FixedTimeEquals(supplied, expected);
+    }
+    catch (Exception exception) when (exception is FormatException or ArgumentOutOfRangeException)
+    {
+        return false;
+    }
+}
+
+app.UseDefaultFiles(); app.UseStaticFiles(); app.UseRateLimiter();
 app.Use(async (context, next) =>
 {
-    if (context.Request.Path.StartsWithSegments("/api/admin") && context.Request.Headers["X-Iota-Admin-Token"] != adminToken)
-    { context.Response.StatusCode = 401; await context.Response.WriteAsync("管理员令牌错误"); return; }
+    var path = context.Request.Path;
+    var isAuthEndpoint = path == "/api/admin/login" || path == "/api/admin/logout";
+    if (path.StartsWithSegments("/api/admin") && !isAuthEndpoint &&
+        !IsSessionValid(context.Request.Cookies[adminCookieName]))
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        await context.Response.WriteAsJsonAsync(new { message = "登录已失效，请重新登录" });
+        return;
+    }
     await next();
 });
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+
+app.MapPost("/api/admin/login", (AdminLoginRequest input, HttpContext context) =>
+{
+    var usernameMatches = SecureCredentialEquals(input.Username?.Trim(), adminUsernameHash);
+    var passwordMatches = SecureCredentialEquals(input.Password, adminPasswordHash);
+    if (!usernameMatches || !passwordMatches)
+        return Results.Json(new { message = "账号或密码错误" }, statusCode: StatusCodes.Status401Unauthorized);
+
+    var expiresAt = DateTimeOffset.UtcNow.AddDays(30);
+    context.Response.Cookies.Append(adminCookieName, CreateSessionToken(expiresAt), new CookieOptions
+    {
+        HttpOnly = true,
+        SameSite = SameSiteMode.Strict,
+        Secure = context.Request.IsHttps,
+        IsEssential = true,
+        Path = "/",
+        Expires = expiresAt,
+        MaxAge = TimeSpan.FromDays(30)
+    });
+    return Results.Ok(new { username = adminUsername });
+}).RequireRateLimiting("admin-login");
+
+app.MapPost("/api/admin/logout", (HttpContext context) =>
+{
+    context.Response.Cookies.Delete(adminCookieName, new CookieOptions
+    {
+        HttpOnly = true,
+        SameSite = SameSiteMode.Strict,
+        Secure = context.Request.IsHttps,
+        IsEssential = true,
+        Path = "/"
+    });
+    return Results.NoContent();
+});
 
 app.MapGet("/api/admin/instances", (SyncStore store) => Results.Ok(store.State.Instances.Values.OrderBy(x => x.InstanceId)));
 app.MapPost("/api/admin/instances", (CreateInstance input, SyncStore store) =>
@@ -132,3 +236,8 @@ public sealed class CreateInstance
     public string RootPath { get; set; } = "";
 }
 public sealed class CodeRequest { public string Name { get; set; } = ""; }
+public sealed class AdminLoginRequest
+{
+    public string Username { get; set; } = "";
+    public string Password { get; set; } = "";
+}

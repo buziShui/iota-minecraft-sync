@@ -10,7 +10,8 @@ services:
       - "8080:8080"
     environment:
       TZ: Asia/Shanghai
-      IOTA_ADMIN_TOKEN: "${IOTA_ADMIN_TOKEN:?请先在 .env 中设置管理员令牌}"
+      IOTA_ADMIN_USERNAME: "${IOTA_ADMIN_USERNAME:?请先在 .env 中设置管理员账号}"
+      IOTA_ADMIN_PASSWORD: "${IOTA_ADMIN_PASSWORD:?请先在 .env 中设置管理员密码}"
     volumes:
       - ./data:/data
       # 按实际路径增加只读挂载；冒号右侧是管理页中填写的容器内目录。
