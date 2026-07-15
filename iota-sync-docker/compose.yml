@@ -8,10 +8,16 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       TZ: Asia/Shanghai
       IOTA_ADMIN_USERNAME: "${IOTA_ADMIN_USERNAME:?请先在 .env 中设置管理员账号}"
       IOTA_ADMIN_PASSWORD: "${IOTA_ADMIN_PASSWORD:?请先在 .env 中设置管理员密码}"
+      IOTA_MSLX_BASE_URL: "${IOTA_MSLX_BASE_URL:-}"
+      IOTA_MSLX_PUBLIC_URL: "${IOTA_MSLX_PUBLIC_URL:-}"
+      IOTA_MSLX_API_KEY: "${IOTA_MSLX_API_KEY:-}"
+      IOTA_MSLX_SERVERS_ROOT: "${IOTA_MSLX_SERVERS_ROOT:-/servers}"
     volumes:
       - ./data:/data
       # 按实际路径增加只读挂载；冒号右侧是管理页中填写的容器内目录。

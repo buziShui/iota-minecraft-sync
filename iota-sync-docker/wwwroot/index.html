@@ -3,20 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#171a2b">
-  <title>Iota Sync · 管理中心</title>
-  <link rel="stylesheet" href="/style.css?v=20260716a">
+  <meta name="theme-color" content="#6f5bf7">
+  <title>Iota Sync · MSLX 联合管理中心</title>
+  <link rel="stylesheet" href="/style.css?v=20260716e">
 </head>
 <body>
   <section id="login" class="login-page">
     <div class="login-story">
-      <a class="login-brand" href="/" aria-label="Iota Sync 首页"><span class="logo-mark">ι</span><span><b>Iota Sync</b><small>MINECRAFT DELIVERY</small></span></a>
-      <div class="story-copy"><span class="kicker light">PRIVATE DISTRIBUTION</span><h1>把服务端更新，<br><em>稳稳交到玩家手中。</em></h1><p>扫描、审核、发布与客户端分发，在一个清晰的工作流里完成。</p></div>
-      <div class="story-flow"><span>01 扫描差异</span><i></i><span>02 人工审核</span><i></i><span>03 安全发布</span></div>
+      <a class="login-brand" href="/" aria-label="Iota Sync 首页"><span class="logo-mark">ι</span><span><b>Iota Sync</b><small>MSLX DELIVERY CENTER</small></span></a>
+      <div class="story-copy"><span class="kicker light">MSLX CONNECTED</span><h1>一个面板，<br><em>管理服务端与客户端。</em></h1><p>复用 MSLX 的实例控制能力，将运行、文件与版本同步收进同一条工作流。</p></div>
+      <div class="story-flow"><span>服务端控制</span><i></i><span>文件管理</span><i></i><span>客户端同步</span></div>
     </div>
     <div class="login-form-wrap">
       <form class="login-card" onsubmit="login();return false">
-        <span class="kicker">ADMIN CONSOLE</span><h2>欢迎回来</h2><p>使用部署时设置的管理员账号登录。</p>
+        <div class="login-symbol"><span class="logo-mark">ι</span></div><span class="kicker">IOTA × MSLX</span><h2>连接到管理中心</h2><p>统一管理 MSLX 服务端与 PCL IO 客户端分发。</p>
         <label class="field"><span>管理员账号</span><input id="adminUsername" type="text" placeholder="请输入管理员账号" autocomplete="username" autofocus></label>
         <label class="field"><span>管理员密码</span><div class="input-action"><input id="adminPassword" type="password" placeholder="请输入管理员密码" autocomplete="current-password"><button type="button" aria-label="显示密码" onclick="togglePassword(this)">查看</button></div></label>
         <button class="btn primary wide" type="submit">进入管理中心 <span>→</span></button>
@@ -27,23 +27,27 @@
 
   <div id="app" class="shell" hidden>
     <aside class="sidebar">
-      <a class="brand" href="#overview" onclick="showView('overview')"><span class="logo-mark">ι</span><span><b>Iota Sync</b><small>管理中心</small></span></a>
+      <a class="brand" href="#overview" onclick="showView('overview')"><span class="logo-mark">ι</span><span><b>Iota Sync</b><small>MSLX 联合管理中心</small></span></a>
       <nav class="nav" aria-label="主导航">
+        <span class="nav-label">工作台</span>
         <button class="nav-item active" data-view="overview" onclick="showView('overview')"><svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg><span>运行总览</span></button>
-        <button class="nav-item" data-view="instances" onclick="showView('instances')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01"/></svg><span>服务端实例</span><b id="navInstances">0</b></button>
+        <button class="nav-item" data-view="mslx" onclick="showView('mslx')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01"/></svg><span>服务器控制</span><b id="navMslx">0</b></button>
+        <span class="nav-label">客户端分发</span>
+        <button class="nav-item" data-view="instances" onclick="showView('instances')"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span>客户端同步</span><b id="navInstances">0</b></button>
         <button class="nav-item" data-view="codes" onclick="showView('codes')"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8M15 8l3 3M17 6l2 2"/></svg><span>同步码</span><b id="navCodes">0</b></button>
         <button class="nav-item" data-view="launcher" onclick="showView('launcher')"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span>PCL IO 客户端</span></button>
       </nav>
+      <div id="mslxSideStatus" class="mslx-side-status"><span class="online-dot"></span><div><b>MSLX</b><small>正在连接 Daemon…</small></div></div>
       <div class="source-card"><span>客户端同步源</span><code id="sourceUrl"></code><button onclick="copySource()">复制地址</button></div>
       <div class="sidebar-foot"><div><span class="online-dot"></span><p><b>服务运行正常</b><small>Docker · 私有部署</small></p></div><button id="logout" class="icon-button" aria-label="退出登录" title="退出登录">↪</button></div>
     </aside>
 
     <main class="content">
-      <header class="mobile-top"><button class="icon-button" onclick="toggleSidebar()" aria-label="打开菜单">☰</button><b>Iota Sync</b><div><button class="icon-button" onclick="toggleTheme()" aria-label="切换主题">◐</button><button class="icon-button" onclick="loadAll()" aria-label="刷新数据">↻</button></div></header>
+      <header class="mobile-top"><button class="icon-button" onclick="toggleSidebar()" aria-label="打开菜单">☰</button><b>Iota × MSLX</b><div><button class="icon-button" onclick="toggleTheme()" aria-label="切换主题">◐</button><button class="icon-button" onclick="loadAll()" aria-label="刷新数据">↻</button></div></header>
       <header class="topline"><div><span id="pageKicker" class="kicker">WORKSPACE</span><h1 id="pageTitle">运行总览</h1></div><div class="top-actions"><span id="lastUpdated">尚未刷新</span><button class="icon-button" onclick="toggleTheme()" aria-label="切换主题" title="切换明暗主题">◐</button><button class="btn secondary" onclick="loadAll(this)">↻ 刷新数据</button></div></header>
 
       <section id="view-overview" class="view active">
-        <div class="welcome-banner"><div><span class="kicker light">GOOD TO SEE YOU</span><h2>同步服务已就绪</h2><p id="welcomeText">正在读取实例状态…</p></div><button class="btn light-button" onclick="showView('instances')">管理服务端 <span>→</span></button></div>
+        <div class="welcome-banner"><div><span class="kicker light">IOTA × MSLX</span><h2>服务端与客户端，已经在同一处</h2><p id="welcomeText">正在读取实例状态…</p></div><button class="btn light-button" onclick="showView('mslx')">进入服务器控制 <span>→</span></button></div>
         <div class="metric-grid">
           <article class="metric-card"><span class="metric-icon purple"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/></svg></span><div><strong id="metricInstances">0</strong><small>服务端实例</small></div><em>已连接</em></article>
           <article class="metric-card"><span class="metric-icon teal"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></span><div><strong id="metricFiles">0</strong><small>最近扫描文件</small></div><em id="metricReview">0 待审核</em></article>
@@ -51,7 +55,7 @@
           <article class="metric-card"><span class="metric-icon amber"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8"/></svg></span><div><strong id="metricCodes">0</strong><small>有效同步码</small></div><em id="metricRevoked">0 已撤销</em></article>
         </div>
         <div class="overview-grid">
-          <article class="card"><div class="card-head"><div><span class="kicker">SERVERS</span><h2>服务端状态</h2></div><button class="text-button" onclick="showView('instances')">查看全部 →</button></div><div id="overviewInstances" class="overview-servers"></div></article>
+          <article class="card"><div class="card-head"><div><span class="kicker">MSLX SERVERS</span><h2>服务端状态</h2></div><button class="text-button" onclick="showView('mslx')">查看全部 →</button></div><div id="overviewInstances" class="overview-servers"></div></article>
           <article class="card"><div class="card-head"><div><span class="kicker">WORKFLOW</span><h2>推荐发布流程</h2></div></div><ol class="workflow"><li><span>1</span><div><b>停止 Minecraft 服务端</b><small>避免扫描期间文件继续变化</small></div></li><li><span>2</span><div><b>扫描并审核端侧分类</b><small>重点处理待人工确认的文件</small></div></li><li><span>3</span><div><b>再次确认停服并发布</b><small>PCL IO 会在玩家刷新时获取新版本</small></div></li></ol></article>
         </div>
         <div class="overview-grid lower">
@@ -60,8 +64,15 @@
         </div>
       </section>
 
+      <section id="view-mslx" class="view">
+        <div class="mslx-page-head card"><div><span class="kicker">MSLX DAEMON</span><h2>服务器控制</h2><p>直接管理现有 MSLX 实例，并将实例关联到 Iota 客户端同步。</p></div><div class="mslx-head-actions"><span id="mslxConnectionBadge" class="pill neutral">正在连接</span><button id="openMslxPanelButton" class="btn secondary" onclick="openMslxPanel()">打开 MSLX 面板 ↗</button><button class="btn secondary" onclick="loadMslx(true)">↻ 刷新实例</button></div></div>
+        <div id="mslxNotice"></div>
+        <div id="mslxInstanceGrid" class="mslx-instance-grid"></div>
+        <div id="mslxWorkspace" class="mslx-workspace"></div>
+      </section>
+
       <section id="view-instances" class="view">
-        <div class="page-actions"><div><p>选择一个实例进行配置、扫描和发布。</p></div><button class="btn primary" onclick="openAddInstance()">＋ 添加实例</button></div>
+        <div class="page-actions card page-title-card"><div><h2>客户端同步</h2><p>配置扫描目录、管理服务端与同步 Mod，并发布 PCL IO 正式快照。</p></div><button class="btn primary" onclick="showView('mslx')">从 MSLX 关联实例</button></div>
         <div id="instancePicker" class="instance-picker"></div>
         <div id="instanceWorkspace"></div>
       </section>
@@ -84,6 +95,6 @@
   <div id="sidebarMask" class="sidebar-mask" hidden onclick="toggleSidebar(false)"></div>
   <div id="modal" class="modal-backdrop" hidden><section class="modal"><header><div><span id="modalKicker" class="kicker">ACTION</span><h2 id="modalTitle"></h2></div><button class="icon-button" onclick="closeModal()">×</button></header><div id="modalBody"></div><footer id="modalActions"></footer></section></div>
   <div id="toast" role="status"><span></span><p></p><button onclick="this.parentElement.hidden=true">×</button></div>
-  <script src="/app.js?v=20260716a"></script>
+  <script src="/app.js?v=20260716e"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
-# Iota Sync 独立 Docker 版
+# Iota Sync × MSLX Docker 版
 
-这是完全脱离 MSLX 的独立同步服务，自带中文 Web 管理页，并保持 PCL IO 的 `iota-sync/1` 客户端协议兼容。
+这是可独立运行、也可连接现有 MSLX Daemon 的同步服务，自带 MSLX 风格中文 Web 管理页，并保持 PCL IO 的 `iota-sync/1` 客户端协议兼容。
 
 ## 快速部署
 
@@ -13,10 +13,26 @@ docker compose -f iota-sync-docker/compose.yml up -d --build
 ```
 
 4. 浏览器访问 `http://服务器地址:8080`，输入管理员账号和密码。登录状态由 30 天有效的 HttpOnly Cookie 保持。
-5. 添加实例时填写名称和容器内路径（例如 `/servers/friends`），配置 MC/加载器版本及玩家连接地址。
-6. 停止 Minecraft 服务端，勾选停服确认，扫描并人工检查分类。
-7. 再次勾选停服确认并发布，随后为玩家创建长期同步码。
+5. 推荐在 `.env` 中配置 MSLX 连接参数，然后在“服务器控制”中关联实例。
+6. 停止 Minecraft 服务端，扫描并人工检查分类；关联后系统会通过 MSLX 自动校验停服状态。
+7. 发布正式版本，随后为玩家创建长期同步码。
 8. PCL IO 中的同步源填写此服务的外部根地址及同步码。
+
+## MSLX 集成
+
+Iota 后端使用 MSLX 官方 API 读取实例状态、玩家、备份和文件，并代理启动、停止、重启、备份及文件管理操作。MSLX API Key 不会返回给前端。实例目录仍以只读方式挂载给 Iota 的扫描与发布模块：
+
+```yaml
+environment:
+  IOTA_MSLX_BASE_URL: "${IOTA_MSLX_BASE_URL:-}"
+  IOTA_MSLX_PUBLIC_URL: "${IOTA_MSLX_PUBLIC_URL:-}"
+  IOTA_MSLX_API_KEY: "${IOTA_MSLX_API_KEY:-}"
+  IOTA_MSLX_SERVERS_ROOT: "${IOTA_MSLX_SERVERS_ROOT:-/servers}"
+volumes:
+  - /vol1/@appshare/MSLX/Servers:/servers:ro
+```
+
+若两个容器不在同一 Docker 网络，可在 Compose 中增加 `host.docker.internal:host-gateway`，并把内部地址写成 `http://host.docker.internal:1027`。如果不配置 MSLX，所有原有同步功能仍可使用，但扫描与发布前需要手工确认停服。
 
 ## PassNat / FRP
 
@@ -46,5 +62,6 @@ docker compose -f iota-sync-docker/compose.yml up -d --build
 - 登录会话使用签名的 HttpOnly、SameSite=Strict Cookie。修改账号或密码并重启容器后，已有会话会自动失效。
 - 登录接口按来源限制为每分钟最多 5 次尝试。
 - 不要把管理员密码或玩家同步码写入公开仓库、日志或群聊截图。
+- MSLX API Key 只放入未提交的 `.env`，不要写入公开仓库或浏览器配置。
 - Minecraft 目录只读挂载；服务只读取源文件并把发布快照写入 `/data`。
-- 独立容器无法可靠检测宿主机 Minecraft 进程，扫描与发布前必须由管理员确认已经停服。
+- 未连接 MSLX 时，独立容器无法可靠检测宿主机 Minecraft 进程，扫描与发布前必须由管理员确认已经停服。

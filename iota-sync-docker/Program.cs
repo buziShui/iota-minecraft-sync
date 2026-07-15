@@ -12,6 +12,7 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 });
 builder.Services.Configure<FormOptions>(x => x.MultipartBodyLengthLimit = 200_000_000);
 builder.Services.AddSingleton<SyncStore>();
+builder.Services.AddHttpClient<MslxClient>(client => client.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -29,6 +30,7 @@ var app = builder.Build();
 const string adminCookieName = "iota_admin_session";
 var adminUsername = builder.Configuration["IOTA_ADMIN_USERNAME"]?.Trim();
 var adminPassword = builder.Configuration["IOTA_ADMIN_PASSWORD"];
+var mslxServersRoot = Path.GetFullPath(builder.Configuration["IOTA_MSLX_SERVERS_ROOT"] ?? "/servers");
 if (string.IsNullOrWhiteSpace(adminUsername))
     throw new InvalidOperationException("必须设置 IOTA_ADMIN_USERNAME");
 if (string.IsNullOrWhiteSpace(adminPassword) || adminPassword.Length < 12)
@@ -80,6 +82,19 @@ bool IsSessionValid(string? token)
 app.UseDefaultFiles(); app.UseStaticFiles(); app.UseRateLimiter();
 app.Use(async (context, next) =>
 {
+    try
+    {
+        await next();
+    }
+    catch (MslxIntegrationException exception)
+    {
+        if (context.Response.HasStarted) throw;
+        context.Response.StatusCode = StatusCodes.Status502BadGateway;
+        await context.Response.WriteAsJsonAsync(new { message = exception.Message });
+    }
+});
+app.Use(async (context, next) =>
+{
     var path = context.Request.Path;
     var isAuthEndpoint = path == "/api/admin/login" || path == "/api/admin/logout";
     if (path.StartsWithSegments("/api/admin") && !isAuthEndpoint &&
@@ -128,6 +143,79 @@ app.MapPost("/api/admin/logout", (HttpContext context) =>
     return Results.NoContent();
 });
 
+app.MapGet("/api/admin/mslx/status", async (MslxClient mslx, CancellationToken cancellationToken) =>
+{
+    if (!mslx.Configured)
+        return Results.Ok(new { configured = false, connected = false, error = mslx.ConfigurationError, publicUrl = mslx.PublicUrl });
+
+    try
+    {
+        var status = await mslx.GetDataAsync("/api/status", cancellationToken);
+        return Results.Ok(new { configured = true, connected = true, publicUrl = mslx.PublicUrl, status });
+    }
+    catch (MslxIntegrationException exception)
+    {
+        return Results.Ok(new { configured = true, connected = false, publicUrl = mslx.PublicUrl, error = exception.Message });
+    }
+});
+app.MapGet("/api/admin/mslx/instances", async (MslxClient mslx, CancellationToken cancellationToken) =>
+    Results.Ok(await mslx.GetDataAsync("/api/instance/list", cancellationToken)));
+app.MapGet("/api/admin/mslx/instances/{id:int}", async (int id, MslxClient mslx, CancellationToken cancellationToken) =>
+    Results.Ok(await mslx.GetDataAsync($"/api/instance/info?id={id}", cancellationToken)));
+app.MapPost("/api/admin/mslx/instances/{id:int}/action", async (int id, MslxActionRequest input, MslxClient mslx, CancellationToken cancellationToken) =>
+{
+    var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "start", "stop", "restart", "forceExit", "backup" };
+    if (!allowed.Contains(input.Action)) return Results.BadRequest("不支持的 MSLX 实例操作");
+    return Results.Ok(await mslx.PostDataAsync("/api/instance/action", new { id, action = input.Action }, cancellationToken));
+});
+app.MapGet("/api/admin/mslx/instances/{id:int}/files", async (int id, string? path, MslxClient mslx, CancellationToken cancellationToken) =>
+    Results.Ok(await mslx.GetDataAsync($"/api/files/instance/{id}/lists?path={Uri.EscapeDataString(path ?? string.Empty)}", cancellationToken)));
+app.MapGet("/api/admin/mslx/instances/{id:int}/file", async (int id, string path, MslxClient mslx, CancellationToken cancellationToken) =>
+    Results.Ok(await mslx.GetDataAsync($"/api/files/instance/{id}/content?path={Uri.EscapeDataString(path)}", cancellationToken)));
+app.MapPost("/api/admin/mslx/instances/{id:int}/file", async (int id, MslxFileContentRequest input, MslxClient mslx, CancellationToken cancellationToken) =>
+    Results.Ok(await mslx.PostDataAsync($"/api/files/instance/{id}/content", new { input.Path, input.Content }, cancellationToken)));
+app.MapPost("/api/admin/mslx/instances/{id:int}/directory", async (int id, MslxDirectoryRequest input, MslxClient mslx, CancellationToken cancellationToken) =>
+    Results.Ok(await mslx.PostDataAsync($"/api/files/instance/{id}/directory", new { input.Path, input.Name }, cancellationToken)));
+app.MapPost("/api/admin/mslx/instances/{id:int}/rename", async (int id, MslxRenameRequest input, MslxClient mslx, CancellationToken cancellationToken) =>
+    Results.Ok(await mslx.PostDataAsync($"/api/files/instance/{id}/rename", new { input.OldPath, input.NewPath }, cancellationToken)));
+app.MapPost("/api/admin/mslx/instances/{id:int}/delete", async (int id, MslxDeleteRequest input, MslxClient mslx, CancellationToken cancellationToken) =>
+    Results.Ok(await mslx.PostDataAsync($"/api/files/instance/{id}/delete", new { input.Paths }, cancellationToken)));
+app.MapGet("/api/admin/mslx/instances/{id:int}/backups", async (int id, MslxClient mslx, CancellationToken cancellationToken) =>
+    Results.Ok(await mslx.GetDataAsync($"/api/instance/backups/{id}", cancellationToken)));
+app.MapGet("/api/admin/mslx/instances/{id:int}/players", async (int id, MslxClient mslx, CancellationToken cancellationToken) =>
+    Results.Ok(await mslx.GetDataAsync($"/api/instance/players/online/{id}", cancellationToken)));
+app.MapPost("/api/admin/mslx/instances/{mslxId:int}/link", async (int mslxId, MslxLinkRequest input, SyncStore store, MslxClient mslx, CancellationToken cancellationToken) =>
+{
+    if (mslxId <= 0) return Results.BadRequest("MSLX 实例 ID 无效");
+    var info = await mslx.GetDataAsync($"/api/instance/info?id={mslxId}", cancellationToken);
+    var name = info.TryGetProperty("name", out var nameElement) ? nameElement.GetString()?.Trim() : null;
+    var suggestedRoot = Path.GetFullPath(Path.Combine(mslxServersRoot, mslxId.ToString()));
+    if (!Directory.Exists(suggestedRoot)) return Results.BadRequest($"同步容器中未找到 MSLX 实例目录：{suggestedRoot}");
+
+    InstanceSettings? item = null;
+    if (input.IotaInstanceId is int iotaId)
+    {
+        if (!store.State.Instances.TryGetValue(iotaId, out item)) return Results.NotFound("指定的同步实例不存在");
+    }
+    else
+    {
+        item = store.State.Instances.Values.FirstOrDefault(x => x.MslxInstanceId == mslxId ||
+            string.Equals(Path.GetFullPath(x.RootPath), suggestedRoot, StringComparison.OrdinalIgnoreCase));
+    }
+
+    if (item is null)
+    {
+        var id = store.State.NextInstanceId++;
+        item = new InstanceSettings { InstanceId = id, Name = name ?? $"MSLX 实例 {mslxId}", RootPath = suggestedRoot };
+        store.State.Instances[id] = item;
+    }
+
+    item.MslxInstanceId = mslxId;
+    if (string.IsNullOrWhiteSpace(item.Name)) item.Name = name ?? $"MSLX 实例 {mslxId}";
+    store.Save();
+    return Results.Ok(item);
+});
+
 app.MapGet("/api/admin/instances", (SyncStore store) => Results.Ok(store.State.Instances.Values.OrderBy(x => x.InstanceId)));
 app.MapPost("/api/admin/instances", (CreateInstance input, SyncStore store) =>
 {
@@ -148,10 +236,17 @@ app.MapDelete("/api/admin/instances/{id:int}", (int id, SyncStore store) =>
     foreach (var code in store.State.Codes.Where(x => x.InstanceId == id)) code.Enabled = false;
     store.Save(); return Results.NoContent();
 });
-app.MapPost("/api/admin/instances/{id:int}/scan", (int id, SyncStore store) =>
+app.MapPost("/api/admin/instances/{id:int}/scan", async Task<IResult> (int id, SyncStore store, MslxClient mslx, CancellationToken cancellationToken) =>
 {
     if (!store.State.Instances.TryGetValue(id, out var item)) return Results.NotFound();
-    if (!item.StopConfirmed) return Results.Conflict("请先停止 Minecraft 服务端并勾选停服确认");
+    if (item.MslxInstanceId is int mslxId)
+    {
+        if (!mslx.Configured) return Results.Conflict("此实例已关联 MSLX，但 Daemon 连接尚未配置");
+        var info = await mslx.GetDataAsync($"/api/instance/info?id={mslxId}", cancellationToken);
+        if (!info.TryGetProperty("status", out var status) || status.GetInt32() != 0)
+            return Results.Conflict("MSLX 显示实例仍在运行，请先停止服务端");
+    }
+    else if (!item.StopConfirmed) return Results.Conflict("请先停止 Minecraft 服务端并勾选停服确认");
     var root = Path.GetFullPath(item.RootPath); if (!Directory.Exists(root)) return Results.BadRequest("实例目录不存在");
     var files = new List<ScanFile>();
     foreach (var dirSetting in item.Directories.Where(x => x.Enabled))
@@ -166,10 +261,17 @@ app.MapPost("/api/admin/instances/{id:int}/scan", (int id, SyncStore store) =>
     }
     item.LastScan = files.OrderBy(x => x.Path, StringComparer.Ordinal).ToList(); item.StopConfirmed = false; store.Save(); return Results.Ok(item.LastScan);
 });
-app.MapPost("/api/admin/instances/{id:int}/publish", (int id, SyncStore store) =>
+app.MapPost("/api/admin/instances/{id:int}/publish", async Task<IResult> (int id, SyncStore store, MslxClient mslx, CancellationToken cancellationToken) =>
 {
     if (!store.State.Instances.TryGetValue(id, out var item)) return Results.NotFound();
-    if (!item.StopConfirmed) return Results.Conflict("请再次确认 Minecraft 服务端已停止");
+    if (item.MslxInstanceId is int mslxId)
+    {
+        if (!mslx.Configured) return Results.Conflict("此实例已关联 MSLX，但 Daemon 连接尚未配置");
+        var info = await mslx.GetDataAsync($"/api/instance/info?id={mslxId}", cancellationToken);
+        if (!info.TryGetProperty("status", out var status) || status.GetInt32() != 0)
+            return Results.Conflict("MSLX 显示实例仍在运行，请先停止服务端");
+    }
+    else if (!item.StopConfirmed) return Results.Conflict("请再次确认 Minecraft 服务端已停止");
     if (item.LastScan.Count == 0) return Results.BadRequest("请先扫描");
     if (item.LastScan.Any(x => string.IsNullOrWhiteSpace(x.Path) || string.IsNullOrWhiteSpace(x.Sha256))) return Results.BadRequest("扫描数据无效，请重新扫描");
     if (item.LastScan.Any(x => x.Side == FileSide.Unreviewed)) return Results.BadRequest("仍有待人工确认的 Mod");
@@ -241,3 +343,9 @@ public sealed class AdminLoginRequest
     public string Username { get; set; } = "";
     public string Password { get; set; } = "";
 }
+public sealed class MslxActionRequest { public string Action { get; set; } = ""; }
+public sealed class MslxLinkRequest { public int? IotaInstanceId { get; set; } }
+public sealed class MslxFileContentRequest { public string Path { get; set; } = ""; public string Content { get; set; } = ""; }
+public sealed class MslxDirectoryRequest { public string Path { get; set; } = ""; public string Name { get; set; } = ""; }
+public sealed class MslxRenameRequest { public string OldPath { get; set; } = ""; public string NewPath { get; set; } = ""; }
+public sealed class MslxDeleteRequest { public List<string> Paths { get; set; } = []; }

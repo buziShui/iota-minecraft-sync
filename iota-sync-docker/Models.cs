@@ -10,6 +10,7 @@ public sealed record SyncManifest(string Protocol, int InstanceId, string Instan
 public sealed class InstanceSettings
 {
     public int InstanceId { get; set; }
+    public int? MslxInstanceId { get; set; }
     public string Name { get; set; } = "";
     public string RootPath { get; set; } = "";
     public bool StopConfirmed { get; set; }
