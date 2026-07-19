@@ -1,6 +1,6 @@
 # MSLX Iota 客户端同步插件
 
-适配 MSLX 1.4.7，目标运行环境为 Linux x86_64。插件 ID：`mslx-plugin-iota-sync`。
+当前正式版为 1.0.1，适配 MSLX 1.4.7，目标运行环境为 Linux x86_64。插件 ID：`mslx-plugin-iota-sync`。
 
 ## 构建
 

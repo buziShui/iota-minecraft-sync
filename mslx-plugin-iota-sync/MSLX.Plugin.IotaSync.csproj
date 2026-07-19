@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
     <OutputType>Library</OutputType>
+    <Version>1.0.1</Version>
     <GenerateDependencyFile>false</GenerateDependencyFile>
     <DebugType>none</DebugType>
   </PropertyGroup>

@@ -282,7 +282,7 @@ const K = /* @__PURE__ */ e.defineComponent({
   return c;
 }, R = /* @__PURE__ */ J(K, [["__scopeId", "data-v-59e3dd38"]]), z = {
   name: "mslx-plugin-iota-sync",
-  version: "0.1.0",
+  version: "1.0.1",
   routes: [{
     path: "/iota-sync",
     name: "IotaSyncBase",
