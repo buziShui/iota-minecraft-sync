@@ -8,10 +8,10 @@ public sealed class MSLXPluginEntry : IPlugin
     public static MSLXPluginEntry Instance { get; private set; } = null!;
     public string Id => "mslx-plugin-iota-sync";
     public string Name => "Iota 客户端同步";
-    public string Description => "为多个 MSLX 实例发布可校验、可回滚的客户端同步版本。";
-    public string Version => "1.0.1";
+    public string Description => "用双列表批量整理 Mod，为多个 MSLX 实例发布可校验、可回滚的客户端同步版本。";
+    public string Version => "1.1.0";
     public string Icon => "icon.png";
-    public string MinSDKVersion => "1.4.3";
+    public string MinSDKVersion => "1.4.7";
     public string Developer => "BuZiShui";
     public string AuthorUrl => "https://github.com/buziShui";
     public string PluginUrl => "https://github.com/buziShui/iota-minecraft-sync";

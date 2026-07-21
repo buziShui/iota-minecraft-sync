@@ -25,8 +25,8 @@ Iota Minecraft Sync 用于解决 Minecraft 服务器频繁更新 Mod 后，服�
 - 可选内容由玩家选择是否安装；玩家自行添加的未知 Mod 会保留并提示。
 - 只删除以前由同步器管理、且已从新版本移除的文件。
 - 首次添加同步源时，可自动创建独立实例并安装对应的 Minecraft 与加载器。
-- 可自动填写服务器地址，并通过服务端发布 PCL IO 正式版更新。
-- 打开 PCL IO 时检查一次启动器更新；服务器更新后由玩家手动刷新或启动游戏触发检查，不后台轮询。
+- 可自动填写服务器地址；PCL IO 正式版统一在本项目的 GitHub Releases 发布。
+- 打开 PCL IO 时检查一次 GitHub 正式版；服务器更新后由玩家手动刷新或启动游戏触发检查，不后台轮询。
 
 ## 下载
 
@@ -35,7 +35,7 @@ Iota Minecraft Sync 用于解决 Minecraft 服务器频繁更新 Mod 后，服�
 - `MSLX-IotaSync-Plugin-版本号.zip`：服务端插件。
 - `PCL-IO-版本号-windows-x64.zip`：玩家客户端。
 
-当前正式版为 [1.0.0](https://github.com/buziShui/iota-minecraft-sync/releases/tag/v1.0.0)。
+当前源码版本为 1.1.0；已发布版本请以 [GitHub Releases](https://github.com/buziShui/iota-minecraft-sync/releases) 为准。
 
 ## 管理员部署
 
@@ -109,6 +109,7 @@ http://example.passnat.com:12345
 3. 启动程序，按 PCL 默认流程配置 Java 和 Minecraft 文件夹。
 
 PCL IO 支持 Windows 10/11 64 位，仅保留正式版更新通道。
+启动器更新直接检查本项目的 GitHub Releases；MSLX 插件不保存或分发 PCL IO 可执行文件。
 
 ### 2. 添加同步源
 
@@ -206,8 +207,8 @@ dotnet build MSLX.Plugin.IotaSync.csproj -c Release
 - `GET source`：验证同步源并返回绑定实例。
 - `GET manifest`：取得实例的最新发布清单。
 - `GET files/{path}`：下载快照文件，支持 HTTP Range。
-- `GET launcher`：查询 PCL IO 正式版更新。
-- `GET launcher/file`：下载 PCL IO 更新文件。
+
+PCL IO 的版本查询和下载直接使用 GitHub Releases，不经过 MSLX 同步 API。
 
 客户端通过 `X-Iota-Sync-Code` 请求头提交同步码。管理接口要求 MSLX `admin` 角色。请勿将 API 暴露在没有访问控制的反向代理缓存后，也不要记录包含敏感请求头的完整调试日志。
 

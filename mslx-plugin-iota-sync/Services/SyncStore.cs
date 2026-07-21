@@ -1,6 +1,5 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 
 namespace MSLX.Plugin.IotaSync;
@@ -15,15 +14,26 @@ public static class SyncStore
 
     public static void Initialize(string root)
     {
-        _root = Path.GetFullPath(root);
-        Directory.CreateDirectory(ReleasesRoot);
-        var file = Path.Combine(_root, "state.json");
-        if (File.Exists(file)) _state = JsonSerializer.Deserialize<PluginState>(File.ReadAllText(file), Json) ?? new();
+        lock (Gate)
+        {
+            _root = Path.GetFullPath(root);
+            Directory.CreateDirectory(ReleasesRoot);
+            var file = Path.Combine(_root, "state.json");
+            if (File.Exists(file)) _state = JsonSerializer.Deserialize<PluginState>(File.ReadAllText(file), Json) ?? new();
+        }
     }
 
     public static string ReleasesRoot => Path.Combine(_root, "releases");
-    public static string LauncherRoot => Path.Combine(_root, "launcher");
-    public static void Save() { lock (Gate) File.WriteAllText(Path.Combine(_root, "state.json"), JsonSerializer.Serialize(_state, Json)); }
+    public static void Save()
+    {
+        lock (Gate)
+        {
+            var file = Path.Combine(_root, "state.json");
+            var temporary = file + ".tmp";
+            File.WriteAllText(temporary, JsonSerializer.Serialize(_state, Json));
+            File.Move(temporary, file, true);
+        }
+    }
 
     public static string Sha256File(string path)
     {
@@ -37,17 +47,61 @@ public static class SyncStore
         try
         {
             using var zip = ZipFile.OpenRead(path);
-            foreach (var name in new[] { "fabric.mod.json", "META-INF/mods.toml", "META-INF/neoforge.mods.toml" })
+            var fabric = FindEntry(zip, "fabric.mod.json");
+            if (fabric is not null)
             {
-                var entry = zip.GetEntry(name); if (entry is null) continue;
-                using var reader = new StreamReader(entry.Open());
-                var text = reader.ReadToEnd();
-                if (text.Contains("\"environment\"", StringComparison.OrdinalIgnoreCase) && text.Contains("client", StringComparison.OrdinalIgnoreCase)) return (FileSide.Optional, "元数据声明客户端环境");
-                if (text.Contains("serverSideOnly", StringComparison.OrdinalIgnoreCase) || text.Contains("dedicated_server", StringComparison.OrdinalIgnoreCase)) return (FileSide.ServerOnly, "元数据疑似仅服务端");
+                var result = DetectJsonEnvironment(fabric, false);
+                if (result is not null) return result.Value;
+            }
+
+            var quilt = FindEntry(zip, "quilt.mod.json");
+            if (quilt is not null)
+            {
+                var result = DetectJsonEnvironment(quilt, true);
+                if (result is not null) return result.Value;
+            }
+
+            foreach (var name in new[] { "META-INF/mods.toml", "META-INF/neoforge.mods.toml" })
+            {
+                var entry = FindEntry(zip, name); if (entry is null) continue;
+                var text = ReadEntry(entry);
+                var compact = string.Concat(text.Where(x => !char.IsWhiteSpace(x))).ToLowerInvariant();
+                if (compact.Contains("clientsideonly=true") || compact.Contains("displaytest=\"ignore_server_version\""))
+                    return (FileSide.Optional, "Forge/NeoForge 元数据声明仅客户端");
+                if (compact.Contains("serversideonly=true"))
+                    return (FileSide.ServerOnly, "Forge/NeoForge 元数据声明仅服务端");
             }
         }
         catch { return (FileSide.Unreviewed, "无法读取 JAR 元数据，请人工确认"); }
         return (FileSide.Unreviewed, "未发现明确的端侧声明，请人工确认");
+    }
+
+    private static ZipArchiveEntry? FindEntry(ZipArchive zip, string name) =>
+        zip.Entries.FirstOrDefault(x => string.Equals(x.FullName, name, StringComparison.OrdinalIgnoreCase));
+
+    private static string ReadEntry(ZipArchiveEntry entry)
+    {
+        using var reader = new StreamReader(entry.Open());
+        return reader.ReadToEnd();
+    }
+
+    private static (FileSide side, string reason)? DetectJsonEnvironment(ZipArchiveEntry entry, bool quilt)
+    {
+        using var document = JsonDocument.Parse(ReadEntry(entry));
+        var root = document.RootElement;
+        JsonElement environment = default;
+        bool found;
+        if (quilt)
+            found = root.TryGetProperty("minecraft", out var minecraft) && minecraft.ValueKind == JsonValueKind.Object && minecraft.TryGetProperty("environment", out environment);
+        else
+            found = root.TryGetProperty("environment", out environment);
+        if (!found || environment.ValueKind != JsonValueKind.String) return null;
+        return environment.GetString()?.ToLowerInvariant() switch
+        {
+            "client" => (FileSide.Optional, $"{(quilt ? "Quilt" : "Fabric")} 元数据声明仅客户端"),
+            "server" or "dedicated_server" => (FileSide.ServerOnly, $"{(quilt ? "Quilt" : "Fabric")} 元数据声明仅服务端"),
+            _ => null
+        };
     }
 
     public static bool VerifyCode(string raw, out AccessCode code)

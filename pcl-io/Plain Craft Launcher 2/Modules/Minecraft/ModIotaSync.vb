@@ -3,7 +3,7 @@ Imports System.Security.Cryptography
 Imports Newtonsoft.Json.Linq
 
 Public Module ModIotaSync
-    Public Const IotaLauncherVersion As String = "0.1.0"
+    Public Const IotaLauncherVersion As String = "1.1.0"
     Private ReadOnly ConfigPath As String = Paths.Base & "PCL\IotaSync.json"
 
     Public Function LoadSources() As JArray
@@ -60,27 +60,21 @@ Public Module ModIotaSync
     End Sub
 
     Public Sub CheckIotaLauncherUpdate()
-        Dim source = LoadSources().OfType(Of JObject)().FirstOrDefault()
-        If source Is Nothing Then Return
         Try
-            Dim info = RequestJson(source("address").ToString(), source("code").ToString(), "launcher")
-            Dim remoteVersion = info("version")?.ToString()
-            If String.IsNullOrWhiteSpace(remoteVersion) OrElse New Version(remoteVersion) <= New Version(IotaLauncherVersion) Then Return
-            If MyMsgBox($"发现 PCL IO 正式版 {remoteVersion}。" & vbCrLf & info("notes")?.ToString(), "启动器更新", "下载并重启", "稍后") <> 1 Then Return
-            Dim current = Process.GetCurrentProcess().MainModule.FileName, temp = current & ".iota-update"
+            Dim info As JObject
             Using client As New HttpClient()
-                client.DefaultRequestHeaders.Add("X-Iota-Sync-Code", source("code").ToString())
-                Using input = client.GetStreamAsync(source("address").ToString().TrimEnd("/"c) & "/api/plugins/mslx-plugin-iota-sync/sync/launcher/file").Result, output = File.Create(temp)
-                    input.CopyTo(output)
-                End Using
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("PCL-IO/" & IotaLauncherVersion)
+                info = JObject.Parse(client.GetStringAsync("https://api.github.com/repos/buziShui/iota-minecraft-sync/releases/latest").Result)
             End Using
-            If Sha256(temp) <> info("sha256").ToString() Then File.Delete(temp) : Throw New Exception("启动器更新包校验失败")
-            Dim updater = Paths.Base & "PCL\IotaUpdate.cmd"
-            File.WriteAllText(updater, "@echo off" & vbCrLf & "ping 127.0.0.1 -n 3 >nul" & vbCrLf & $"copy /y ""{temp}"" ""{current}"" >nul" & vbCrLf & $"start """" ""{current}""" & vbCrLf & "del /q ""%~f0""", Text.Encoding.Default)
-            Process.Start(New ProcessStartInfo("cmd.exe", "/c """ & updater & """") With {.CreateNoWindow = True, .WindowStyle = ProcessWindowStyle.Hidden})
-            RunInUi(Sub() Application.Current.Shutdown())
+            Dim remoteVersion = info("tag_name")?.ToString().TrimStart("v"c, "V"c)
+            If String.IsNullOrWhiteSpace(remoteVersion) OrElse New Version(remoteVersion) <= New Version(IotaLauncherVersion) Then Return
+            Dim notes = info("body")?.ToString()
+            If notes IsNot Nothing AndAlso notes.Length > 300 Then notes = notes.Substring(0, 300) & "…"
+            If MyMsgBox($"发现 PCL IO 正式版 {remoteVersion}。" & vbCrLf & notes, "启动器更新", "前往 GitHub 下载", "稍后") = 1 Then
+                OpenWebsite(If(info("html_url")?.ToString(), "https://github.com/buziShui/iota-minecraft-sync/releases/latest"))
+            End If
         Catch ex As Exception
-            Logger.Warn(ex, "检查 PCL IO 更新失败")
+            Logger.Warn(ex, "检查 GitHub 上的 PCL IO 更新失败")
         End Try
     End Sub
 

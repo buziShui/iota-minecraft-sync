@@ -40,16 +40,4 @@ public sealed class SyncController : ControllerBase
         return PhysicalFile(file, "application/octet-stream", enableRangeProcessing: true);
     }
 
-    [HttpGet("launcher")]
-    public IActionResult LauncherInfo()
-    {
-        if (!Authenticate(out _)) return Unauthorized(); return SyncStore.State.Launcher is null ? NotFound() : Ok(SyncStore.State.Launcher);
-    }
-
-    [HttpGet("launcher/file")]
-    public IActionResult LauncherFile()
-    {
-        if (!Authenticate(out _)) return Unauthorized(); var release = SyncStore.State.Launcher; if (release is null) return NotFound();
-        return PhysicalFile(Path.Combine(SyncStore.LauncherRoot, release.FileName), "application/octet-stream", release.FileName, enableRangeProcessing: true);
-    }
 }

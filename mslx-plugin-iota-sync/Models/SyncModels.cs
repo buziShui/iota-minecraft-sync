@@ -38,7 +38,4 @@ public sealed class PluginState
 {
     public Dictionary<int, InstanceSettings> Instances { get; set; } = [];
     public List<AccessCode> Codes { get; set; } = [];
-    public LauncherRelease? Launcher { get; set; }
 }
-
-public sealed record LauncherRelease(string Version, string Notes, string FileName, long Size, string Sha256, DateTimeOffset PublishedAt);

@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -81,23 +80,21 @@ public sealed class AdminController(IMCServerService servers) : ControllerBase
     public IActionResult CreateCode(int id, [FromBody] CodeRequest request)
     {
         if (global::MSLX.SDK.MSLX.Config.Servers.GetServer((uint)id) is null) return NotFound();
-        var created = SyncStore.CreateCode(id, request.Name); return Ok(new { created.model.Id, created.model.Name, created.model.InstanceId, code = created.raw });
+        var name = string.IsNullOrWhiteSpace(request.Name) ? "未命名玩家" : request.Name.Trim();
+        if (name.Length > 64) return BadRequest("同步码备注不能超过 64 个字符");
+        var created = SyncStore.CreateCode(id, name); return Ok(new { created.model.Id, created.model.Name, created.model.InstanceId, created.model.CreatedAt, code = created.raw });
     }
+
+    [HttpGet("codes")]
+    public IActionResult Codes() => Ok(SyncStore.State.Codes
+        .OrderByDescending(x => x.CreatedAt)
+        .Select(x => new { x.Id, x.InstanceId, x.Name, x.Enabled, x.CreatedAt }));
 
     [HttpDelete("codes/{codeId}")]
     public IActionResult Revoke(string codeId)
     {
         var code = SyncStore.State.Codes.FirstOrDefault(x => x.Id == codeId); if (code is null) return NotFound();
         code.Enabled = false; SyncStore.Save(); return NoContent();
-    }
-
-    [HttpPost("launcher")]
-    [RequestSizeLimit(200_000_000)]
-    public async Task<IActionResult> Launcher([FromForm] string version, [FromForm] string notes, IFormFile file)
-    {
-        Directory.CreateDirectory(SyncStore.LauncherRoot); var name = $"pcl-io-{version}.exe"; var path = Path.Combine(SyncStore.LauncherRoot, name);
-        await using (var output = System.IO.File.Create(path)) await file.CopyToAsync(output);
-        SyncStore.State.Launcher = new(version, notes, name, file.Length, SyncStore.Sha256File(path), DateTimeOffset.UtcNow); SyncStore.Save(); return Ok(SyncStore.State.Launcher);
     }
 
     public sealed record CodeRequest(string Name);

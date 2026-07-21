@@ -1,6 +1,8 @@
 # MSLX Iota 客户端同步插件
 
-当前正式版为 1.0.1，适配 MSLX 1.4.7，目标运行环境为 Linux x86_64。插件 ID：`mslx-plugin-iota-sync`。
+当前源码版本为 1.1.0，适配 MSLX 1.4.7，目标运行环境为 Linux x86_64。插件 ID：`mslx-plugin-iota-sync`。
+
+1.1.0 将 Docker 管理版中实用的操作方式同步到插件：提供总览指标、单实例工作区、服务端 Mod / 同步 Mod 双列表、搜索、全选与批量分类、正式版本记录和统一的同步码管理。MSLX 已有的实例与管理员权限直接复用，不再重复提供独立登录。PCL IO 不由插件上传或分发，统一从 [GitHub Releases](https://github.com/buziShui/iota-minecraft-sync/releases/latest) 下载。
 
 ## 构建
 
@@ -18,13 +20,13 @@ dotnet build MSLX.Plugin.IotaSync.csproj -c Release
 
 ## 使用流程
 
-1. 打开“客户端同步”。第一次打开时，插件会对所有已停止实例自动扫描一次。
+1. 打开“客户端同步”，在左侧选择实例。第一次打开时，插件会对所有已停止实例自动扫描一次。
 2. 为实例填写 Minecraft 版本、加载器、加载器版本和玩家实际使用的服务器地址。
 3. 勾选需要同步的目录。默认只有 `mods`；也可选择 `config`、`defaultconfigs`、`kubejs`、资源包和光影包。
 4. 停止 Minecraft 实例，点击“刷新扫描”。运行中的实例禁止扫描和发布。
-5. 检查自动识别结果，把全部“待人工确认”文件改为客户端必需、可选或仅服务端。
+5. 在“Mod 分类”中检查自动识别结果。可以搜索、全选结果或多选批量移动，把全部“待人工确认”文件改为客户端必需、可选或仅服务端。
 6. 点击发布。发布内容复制为不可变快照，每个实例保留最近 5 个版本。
-7. 为每位玩家单独创建一个长期同步码。原始同步码只显示一次，服务端仅保存 PBKDF2 加盐哈希。
+7. 打开“同步码管理”，为每位玩家单独创建一个长期同步码。原始同步码只显示一次，服务端仅保存 PBKDF2 加盐哈希。
 8. 将 PassNat 的 HTTP 映射地址和同步码交给玩家。
 
 ## PassNat
@@ -42,6 +44,7 @@ dotnet build MSLX.Plugin.IotaSync.csproj -c Release
 - `GET sync/source`：验证同步源并返回绑定实例。
 - `GET sync/manifest`：取得最新发布清单。
 - `GET sync/files/{path}`：下载快照文件，支持 HTTP Range。
-- `GET sync/launcher`、`GET sync/launcher/file`：PCL IO 正式版更新。
+
+PCL IO 在启动时直接检查 GitHub Releases，插件不提供客户端程序的上传和下载接口。
 
 管理 API 全部要求 MSLX `admin` 角色；同步 API 使用实例独立的长期同步码。
