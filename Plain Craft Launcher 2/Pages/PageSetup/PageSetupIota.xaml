@@ -1,23 +1,208 @@
-<local:MyPageRight xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PCL" x:Class="PageSetupIota" PanScroll="PanBack">
+<local:MyPageRight xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:local="clr-namespace:PCL"
+                   x:Class="PageSetupIota"
+                   PanScroll="PanBack">
     <local:MyScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="PanBack">
-        <StackPanel Margin="25,25,25,10">
-            <local:MyCard Margin="0,0,0,15" Title="客户端同步">
-                <StackPanel Margin="25,40,25,25">
-                    <TextBlock Text="为不同服务器保存独立的同步地址与长期同步码。选择对应游戏版本启动时，PCL IO 会检查服务器正式版本并同步差异。" TextWrapping="Wrap" Margin="0,0,0,15" />
-                    <StackPanel Orientation="Horizontal">
-                        <local:MyButton x:Name="BtnAdd" Text="添加同步源" Padding="16,8" ColorType="Highlight" Margin="0,0,10,0" />
-                        <local:MyButton x:Name="BtnRefresh" Text="刷新列表" Padding="16,8" />
+        <StackPanel Margin="30,24,30,18">
+            <!-- Page heading -->
+            <Grid Margin="5,0,5,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="同步" FontSize="26" FontWeight="Bold" />
+                    <TextBlock Text="让本地实例与服务器正式版保持一致，同时保留你的个人内容。"
+                               Opacity="0.58" Margin="0,6,24,0" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <local:MyButton x:Name="BtnRefresh" Text="刷新" Padding="15,8" Margin="0,0,8,0" />
+                    <local:MyButton x:Name="BtnAdd" Text="＋ 添加服务器" Padding="17,8" ColorType="Highlight" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Compact status strip, always visible -->
+            <local:MyCard Margin="0,0,0,14">
+                <Grid Margin="22,18,22,18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="0.8*" />
+                        <ColumnDefinition Width="1.3*" />
+                        <ColumnDefinition Width="0.9*" />
+                        <ColumnDefinition Width="1.7*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Margin="0,0,18,0">
+                        <TextBlock Text="服务器" FontSize="11" Opacity="0.48" />
+                        <TextBlock x:Name="LabOverviewSources" Text="0 个" FontSize="17" FontWeight="SemiBold" Margin="0,4,0,0" />
                     </StackPanel>
-                </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="18,0">
+                        <TextBlock Text="当前选择" FontSize="11" Opacity="0.48" />
+                        <TextBlock x:Name="LabOverviewCurrent" Text="尚未选择" FontSize="17" FontWeight="SemiBold"
+                                   Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Margin="18,0">
+                        <TextBlock Text="正式版" FontSize="11" Opacity="0.48" />
+                        <TextBlock x:Name="LabOverviewRelease" Text="—" FontSize="17" FontWeight="SemiBold" Margin="0,4,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Margin="18,0,0,0">
+                        <TextBlock Text="同步状态" FontSize="11" Opacity="0.48" />
+                        <TextBlock x:Name="LabOverviewStatus" Text="尚无同步记录" Margin="0,5,0,0"
+                                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Grid>
             </local:MyCard>
-            <local:MyCard Margin="0,0,0,15" Title="已保存的同步源">
-                <StackPanel x:Name="PanSources" Margin="25,40,25,25" />
-            </local:MyCard>
-            <local:MyCard Margin="0,0,0,15" Title="同步行为">
-                <StackPanel Margin="25,40,25,25">
-                    <TextBlock Text="• 启动与同步源同名的游戏实例时自动检查一次。&#xa;• 服务端更新后可重新启动游戏触发检查，不在后台持续轮询。&#xa;• 玩家自行添加的未知 Mod 会保留。&#xa;• 被覆盖的文件会备份到实例的 .iota-backup 目录。&#xa;• 可选内容的选择会保存在本机，可在来源卡片中重置。" TextWrapping="Wrap" LineHeight="24" />
-                </StackPanel>
-            </local:MyCard>
+
+            <!-- Workflow navigation -->
+            <Border CornerRadius="8" Padding="10,7" Margin="0,0,0,14"
+                    Background="{DynamicResource ColorBrushBackgroundTransparentSidebar}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <local:MyRadioButton x:Name="TabOverview" Text="1  选择服务器" Tag="0" Checked="True" Margin="4,0" Padding="9,0" />
+                        <TextBlock Text="›" Opacity="0.28" VerticalAlignment="Center" Margin="8,0" FontSize="18" />
+                        <local:MyRadioButton x:Name="TabMods" Text="2  管理内容" Tag="1" Margin="4,0" Padding="9,0" />
+                        <TextBlock Text="›" Opacity="0.28" VerticalAlignment="Center" Margin="8,0" FontSize="18" />
+                        <local:MyRadioButton x:Name="TabSync" Text="3  检查并同步" Tag="2" Margin="4,0" Padding="9,0" />
+                        <TextBlock Text="›" Opacity="0.28" VerticalAlignment="Center" Margin="8,0" FontSize="18" />
+                        <local:MyRadioButton x:Name="TabRecords" Text="记录与恢复" Tag="3" Margin="4,0" Padding="9,0" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Step 1 -->
+            <StackPanel x:Name="PanTabOverview">
+                <local:MyCard Margin="0,0,0,14" Title="我的服务器">
+                    <StackPanel Margin="25,40,25,25">
+                        <Grid Margin="0,0,0,15">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="选择服务器后会读取其最新正式版。各服务器的实例绑定、可选内容与忽略规则互不影响。"
+                                       Opacity="0.58" TextWrapping="Wrap" Margin="0,0,20,0" />
+                            <TextBlock Grid.Column="1" Text="同步码仅保存在本机" FontSize="11" Opacity="0.42" VerticalAlignment="Center" />
+                        </Grid>
+                        <StackPanel x:Name="PanSources" />
+                    </StackPanel>
+                </local:MyCard>
+            </StackPanel>
+
+            <!-- Step 2 -->
+            <StackPanel x:Name="PanTabMods" Visibility="Collapsed">
+                <local:MyCard Margin="0,0,0,14" Title="内容选择">
+                    <StackPanel Margin="25,40,25,25">
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock x:Name="LabModsSummary" Text="请先选择服务器。" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="必需内容始终同步；可选内容会按服务器记住你的选择。" Opacity="0.52" Margin="0,5,20,0" />
+                            </StackPanel>
+                            <local:MyButton Grid.Column="1" x:Name="BtnGoDiff" Text="检查差异  →" Padding="16,8"
+                                            ColorType="Highlight" VerticalAlignment="Center" IsEnabled="False" />
+                        </Grid>
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <local:MyTextBox x:Name="TextModSearch" HintText="搜索文件名或路径" Margin="0,0,12,0" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <local:MyButton x:Name="BtnModsRefresh" Text="刷新" Padding="13,7" Margin="0,0,7,0" IsEnabled="False" />
+                                <local:MyButton x:Name="BtnOptionalAll" Text="全选可选" Padding="13,7" Margin="0,0,7,0" IsEnabled="False" />
+                                <local:MyButton x:Name="BtnOptionalNone" Text="清空可选" Padding="13,7" IsEnabled="False" />
+                            </StackPanel>
+                        </Grid>
+                        <StackPanel x:Name="PanMods" />
+                        <Border Height="1" Opacity="0.09" Background="{DynamicResource ColorBrush1}" Margin="0,18,0,18" />
+                        <TextBlock Text="可选文件忽略" FontSize="15" FontWeight="SemiBold" />
+                        <TextBlock Text="只列出管理员允许忽略的配置、资源包和光影文件。" Opacity="0.52" Margin="0,5,0,10" />
+                        <StackPanel x:Name="PanIgnoreRules" />
+                    </StackPanel>
+                </local:MyCard>
+            </StackPanel>
+
+            <!-- Step 3 -->
+            <StackPanel x:Name="PanTabSync" Visibility="Collapsed">
+                <local:MyCard Margin="0,0,0,14" Title="检查并同步">
+                    <StackPanel Margin="25,40,25,25">
+                        <Grid Margin="0,0,0,15">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock x:Name="LabDiffSummary" Text="尚未扫描本地差异。" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="玩家自行添加的未知文件只会提示，不会删除。" Opacity="0.52" Margin="0,5,20,0" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <local:MyButton x:Name="BtnDiffScan" Text="重新扫描" Padding="14,8" Margin="0,0,8,0" IsEnabled="False" />
+                                <local:MyButton x:Name="BtnSyncNow" Text="开始同步" Padding="17,8" ColorType="Highlight" IsEnabled="False" />
+                            </StackPanel>
+                        </Grid>
+                        <Border CornerRadius="6" Padding="14" Margin="0,0,0,15"
+                                Background="{DynamicResource ColorBrushBackgroundTransparentSidebar}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="LabTaskStatus" Text="准备就绪" TextWrapping="Wrap" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <local:MyButton x:Name="BtnRetrySync" Text="重试" Padding="11,5" Margin="0,0,7,0" IsEnabled="False" />
+                                    <local:MyButton x:Name="BtnCancelSync" Text="取消" Padding="11,5" IsEnabled="False" />
+                                </StackPanel>
+                                <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" x:Name="BarTaskProgress"
+                                             Height="5" Minimum="0" Maximum="1" Value="0" Margin="0,11,0,0" />
+                            </Grid>
+                        </Border>
+                        <StackPanel x:Name="PanDiff" />
+                    </StackPanel>
+                </local:MyCard>
+            </StackPanel>
+
+            <!-- Records -->
+            <StackPanel x:Name="PanTabRecords" Visibility="Collapsed">
+                <local:MyCard Margin="0,0,0,14" Title="记录与恢复">
+                    <Grid Margin="25,40,25,25">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition />
+                            <ColumnDefinition Width="1" />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,24,0">
+                            <TextBlock Text="恢复点" FontSize="16" FontWeight="SemiBold" />
+                            <TextBlock x:Name="LabBackupSummary" Text="选择服务器后显示恢复点。" Opacity="0.52" Margin="0,5,0,12" TextWrapping="Wrap" />
+                            <StackPanel x:Name="PanBackups" />
+                        </StackPanel>
+                        <Border Grid.Column="1" Background="{DynamicResource ColorBrush1}" Opacity="0.09" />
+                        <StackPanel Grid.Column="2" Margin="24,0,0,0">
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="同步历史" FontSize="16" FontWeight="SemiBold" />
+                                    <TextBlock Text="最近 30 条记录" Opacity="0.52" Margin="0,5,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <local:MyButton x:Name="BtnHistoryRefresh" Text="刷新" Padding="11,6" Margin="0,0,7,0" />
+                                    <local:MyButton x:Name="BtnExportDiagnostic" Text="导出诊断" Padding="11,6" />
+                                </StackPanel>
+                            </Grid>
+                            <StackPanel x:Name="PanHistory" />
+                        </StackPanel>
+                    </Grid>
+                </local:MyCard>
+                <TextBlock Text="同步仅在启动绑定实例时检查一次，也可由你手动触发。不会后台持续轮询。"
+                           HorizontalAlignment="Center" Opacity="0.42" FontSize="11" Margin="0,4,0,8" />
+            </StackPanel>
         </StackPanel>
     </local:MyScrollViewer>
 </local:MyPageRight>

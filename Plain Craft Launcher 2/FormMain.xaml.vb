@@ -1169,6 +1169,10 @@ Public Class FormMain
         ''' 帮助详情。这是一个副页面。
         ''' </summary>
         HelpDetail = 9
+        ''' <summary>
+        ''' Iota 客户端同步。
+        ''' </summary>
+        Sync = 10
     End Enum
     ''' <summary>
     ''' 次要页面种类。其数值必须与 StackPanel 中的下标一致。
@@ -1186,7 +1190,6 @@ Public Class FormMain
         SetupLink = 1
         SetupUI = 2
         SetupSystem = 3
-        SetupIota = 4
         LinkMain = 0
         OtherHelp = 0
         OtherAbout = 1
@@ -1312,7 +1315,9 @@ Public Class FormMain
             '切换到主页面
             PageChangeExit()
             IsChangingPage = True '防止下面的勾选直接触发了 PageChangeActual
-            CType(PanTitleSelect.Children(Stack), MyRadioButton).SetChecked(True, True, PageNameGet(PageCurrent) = "")
+            Dim targetButton = PanTitleSelect.Children.OfType(Of MyRadioButton)().
+                First(Function(item) CInt(Val(item.Tag)) = CInt(Stack.Page))
+            targetButton.SetChecked(True, True, PageNameGet(PageCurrent) = "")
             IsChangingPage = False
             Select Case Stack.Page
                 Case PageType.Download
@@ -1339,7 +1344,7 @@ Public Class FormMain
     ''' <summary>
     ''' 通过点击导航栏改变页面。
     ''' </summary>
-    Private Sub BtnTitleSelect_Click(sender As MyRadioButton, raiseByMouse As Boolean) Handles BtnTitleSelect0.Check, BtnTitleSelect1.Check, BtnTitleSelect2.Check, BtnTitleSelect3.Check, BtnTitleSelect4.Check
+    Private Sub BtnTitleSelect_Click(sender As MyRadioButton, raiseByMouse As Boolean) Handles BtnTitleSelect0.Check, BtnTitleSelect1.Check, BtnTitleSelect2.Check, BtnTitleSelect3.Check, BtnTitleSelect4.Check, BtnTitleSelect5.Check
         If IsChangingPage Then Return
         PageChangeActual(Val(sender.Tag))
     End Sub
@@ -1420,6 +1425,9 @@ Public Class FormMain
                 Case PageType.Setup '设置
                     If FrmSetupLeft Is Nothing Then FrmSetupLeft = New PageSetupLeft
                     PageChangeAnim(FrmSetupLeft, FrmSetupLeft.PageGet(SubType))
+                Case PageType.Sync '同步
+                    If FrmSetupIota Is Nothing Then FrmSetupIota = New PageSetupIota
+                    PageChangeAnim(New MyPageLeft, FrmSetupIota)
                 Case PageType.Other '更多
                     If FrmOtherLeft Is Nothing Then FrmOtherLeft = New PageOtherLeft
                     PageChangeAnim(FrmOtherLeft, FrmOtherLeft.PageGet(SubType))
