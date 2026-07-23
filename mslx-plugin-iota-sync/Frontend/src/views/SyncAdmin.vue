@@ -168,6 +168,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { MessagePlugin } from 'tdesign-vue-next';
+import hostRequest from 'mslx-request';
 
 interface DirectoryRule { path: string; enabled: boolean }
 interface ScanFile { path: string; size: number; sha256: string; side: number; reason: string }
@@ -230,14 +231,22 @@ function normalizeInstance(item: Omit<Instance, 'settings'> & { settings?: Parti
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
-  const text = await response.text();
-  if (!response.ok) {
-    let message = text || `请求失败（${response.status}）`;
-    try { const data = JSON.parse(text); message = typeof data === 'string' ? data : data.detail || data.title || message; } catch { /* 使用原始响应 */ }
-    throw new Error(message);
+  if (!hostRequest) throw new Error('未检测到 MSLX 宿主请求实例，请确认 MSLX 版本不低于 1.4.7');
+  const method = (init?.method || 'GET').toLowerCase();
+  const supportedMethods = ['get', 'post', 'put', 'delete', 'patch'];
+  if (!supportedMethods.includes(method)) throw new Error(`不支持的请求方法：${method.toUpperCase()}`);
+
+  const config: { url: string; data?: unknown; headers?: HeadersInit } = { url };
+  if (init?.headers) config.headers = init.headers;
+  if (init?.body !== undefined && init.body !== null) {
+    if (typeof init.body === 'string') {
+      try { config.data = JSON.parse(init.body); }
+      catch { config.data = init.body; }
+    } else {
+      config.data = init.body;
+    }
   }
-  return (text ? JSON.parse(text) : null) as T;
+  return await hostRequest[method](config) as T;
 }
 
 async function load() {

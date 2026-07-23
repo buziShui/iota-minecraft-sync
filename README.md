@@ -35,7 +35,7 @@ Iota Minecraft Sync 用于解决 Minecraft 服务器频繁更新 Mod 后，服�
 - `MSLX-IotaSync-Plugin-版本号.zip`：服务端插件。
 - `PCL-IO-版本号-windows-x64.zip`：玩家客户端。
 
-当前源码版本为 1.1.0；已发布版本请以 [GitHub Releases](https://github.com/buziShui/iota-minecraft-sync/releases) 为准。
+当前服务端插件源码版本为 1.1.1；已发布版本请以 [GitHub Releases](https://github.com/buziShui/iota-minecraft-sync/releases) 为准。
 
 ## 管理员部署
 

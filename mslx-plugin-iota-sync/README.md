@@ -1,8 +1,10 @@
 # MSLX Iota 客户端同步插件
 
-当前源码版本为 1.1.0，适配 MSLX 1.4.7，目标运行环境为 Linux x86_64。插件 ID：`mslx-plugin-iota-sync`。
+当前源码版本为 1.1.1，适配 MSLX 1.4.7，目标运行环境为 Linux x86_64。插件 ID：`mslx-plugin-iota-sync`。
 
 1.1.0 将 Docker 管理版中实用的操作方式同步到插件：提供总览指标、单实例工作区、服务端 Mod / 同步 Mod 双列表、搜索、全选与批量分类、正式版本记录和统一的同步码管理。MSLX 已有的实例与管理员权限直接复用，不再重复提供独立登录。PCL IO 不由插件上传或分发，统一从 [GitHub Releases](https://github.com/buziShui/iota-minecraft-sync/releases/latest) 下载。
+
+1.1.1 修复管理页使用原生 `fetch` 导致请求未携带 MSLX 登录凭证、所有管理操作返回 401 的问题。前端现在统一使用宿主提供的 `mslx-request` 实例。
 
 ## 构建
 
