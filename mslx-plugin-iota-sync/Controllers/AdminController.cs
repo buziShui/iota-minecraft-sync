@@ -18,25 +18,29 @@ public sealed class AdminController(IMCServerService servers) : ControllerBase
             foreach (var instance in global::MSLX.SDK.MSLX.Config.Servers.GetServerList().Where(x => !servers.IsServerRunning((uint)x.ID))) Scan(instance.ID);
         var list = global::MSLX.SDK.MSLX.Config.Servers.GetServerList().Select(s => new {
             id = s.ID, s.Name, s.Base, running = servers.IsServerRunning((uint)s.ID),
-            settings = SyncStore.State.Instances.GetValueOrDefault(s.ID)
+            settings = SyncStore.GetInstance(s.ID)
         });
         return Ok(list);
     }
 
     [HttpPut("instances/{id:int}")]
-    public IActionResult Settings(int id, [FromBody] InstanceSettings input)
+    public IActionResult Settings(int id, [FromBody] InstanceSettingsUpdate input) => WithInstanceLock(id, () =>
     {
-        if (id != input.InstanceId || global::MSLX.SDK.MSLX.Config.Servers.GetServer((uint)id) is null) return BadRequest("实例不存在");
-        SyncStore.State.Instances[id] = input; SyncStore.Save(); return Ok(input);
-    }
+        if ((input.InstanceId.HasValue && id != input.InstanceId.Value)
+            || global::MSLX.SDK.MSLX.Config.Servers.GetServer((uint)id) is null)
+            return BadRequest("实例不存在");
+        var settings = SyncStore.UpdateInstance(id, true, value => value.ApplyEditable(input));
+        return Ok(settings);
+    });
 
     [HttpPost("instances/{id:int}/scan")]
-    public IActionResult Scan(int id)
+    public IActionResult Scan(int id) => WithInstanceLock(id, () =>
     {
         if (servers.IsServerRunning((uint)id)) return Conflict("实例运行中，禁止扫描");
         var server = global::MSLX.SDK.MSLX.Config.Servers.GetServer((uint)id); if (server is null) return NotFound();
-        if (!SyncStore.State.Instances.TryGetValue(id, out var settings)) settings = SyncStore.State.Instances[id] = new() { InstanceId = id };
-        var result = new List<ScanFile>();
+        var settings = SyncStore.GetInstance(id) ?? InstanceSettings.CreateDefault(id);
+        settings.Directories = InstanceSettings.NormalizeDirectories(settings.Directories);
+        var result = new Dictionary<string, ScanFile>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in settings.Directories.Where(x => x.Enabled))
         {
             var dir = Path.GetFullPath(Path.Combine(server.Base, item.Path));
@@ -46,56 +50,145 @@ public sealed class AdminController(IMCServerService servers) : ControllerBase
             {
                 var relative = Path.GetRelativePath(server.Base, file).Replace('\\', '/');
                 var detected = SyncStore.DetectSide(file);
-                result.Add(new(relative, new FileInfo(file).Length, SyncStore.Sha256File(file), settings.Overrides.GetValueOrDefault(relative, detected.side), detected.reason));
+                var side = settings.Overrides.TryGetValue(relative, out var overridden)
+                           && overridden != FileSide.Unreviewed
+                    ? overridden
+                    : detected.side;
+                result[relative] = new(relative, new FileInfo(file).Length, SyncStore.Sha256File(file), side, detected.reason, detected.side, detected.runtimeSide);
             }
         }
-        settings.LastScan = result.OrderBy(x => x.Path, StringComparer.Ordinal).ToList(); SyncStore.Save(); return Ok(settings.LastScan);
-    }
+        var scan = InstanceSettings.NormalizeScanFiles(result.Values);
+        SyncStore.UpdateInstance(id, true, value => value.LastScan = scan);
+        return Ok(scan);
+    });
 
     [HttpPost("instances/{id:int}/publish")]
-    public IActionResult Publish(int id)
+    public IActionResult Publish(int id) => WithInstanceLock(id, () =>
     {
         if (servers.IsServerRunning((uint)id)) return Conflict("实例运行中，禁止发布");
         var server = global::MSLX.SDK.MSLX.Config.Servers.GetServer((uint)id); if (server is null) return NotFound();
-        if (!SyncStore.State.Instances.TryGetValue(id, out var settings) || settings.LastScan.Count == 0) return BadRequest("请先扫描并确认文件分类");
+        var settings = SyncStore.GetInstance(id);
+        if (settings is null || settings.LastScan.Count == 0) return BadRequest("请先扫描并确认文件分类");
         if (settings.LastScan.Any(x => x.Side == FileSide.Unreviewed)) return BadRequest("仍有未确认端侧的 Mod");
-        var releaseId = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss");
-        var releaseRoot = Path.Combine(SyncStore.ReleasesRoot, id.ToString(), releaseId); Directory.CreateDirectory(releaseRoot);
+
+        var sources = new List<(ScanFile File, string Source)>();
         foreach (var file in settings.LastScan.Where(x => x.Side != FileSide.ServerOnly))
         {
-            var source = Path.GetFullPath(Path.Combine(server.Base, file.Path));
+            string source;
+            try
+            {
+                source = SyncStore.SafeServerFile(server.Base, file.Path);
+            }
+            catch (InvalidOperationException error)
+            {
+                return BadRequest(error.Message);
+            }
             if (!System.IO.File.Exists(source) || SyncStore.Sha256File(source) != file.Sha256) return Conflict($"文件已变化，请重新扫描：{file.Path}");
-            var target = SyncStore.SafeReleaseFile(id, releaseId, file.Path); Directory.CreateDirectory(Path.GetDirectoryName(target)!); System.IO.File.Copy(source, target, true);
+            sources.Add((file, source));
         }
+
+        var releaseId = SyncStore.CreateReleaseId();
+        var instanceReleaseRoot = Path.Combine(SyncStore.ReleasesRoot, id.ToString());
+        var releaseRoot = Path.Combine(instanceReleaseRoot, releaseId);
+        var temporaryRoot = Path.Combine(instanceReleaseRoot, $".{releaseId}.tmp-{Guid.NewGuid():N}");
         var manifest = new SyncManifest("iota-sync/1", id, server.Name, releaseId, DateTimeOffset.UtcNow,
             settings.MinecraftVersion, settings.Loader, settings.LoaderVersion, settings.ServerAddress,
             settings.LastScan.Where(x => x.Side != FileSide.ServerOnly).ToList());
-        System.IO.File.WriteAllText(Path.Combine(releaseRoot, "manifest.json"), JsonSerializer.Serialize(manifest, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
-        settings.Releases.Insert(0, releaseId);
-        foreach (var old in settings.Releases.Skip(5).ToList()) { Directory.Delete(Path.Combine(SyncStore.ReleasesRoot, id.ToString(), old), true); settings.Releases.Remove(old); }
-        SyncStore.Save(); return Ok(manifest);
-    }
+
+        try
+        {
+            Directory.CreateDirectory(temporaryRoot);
+            foreach (var (file, source) in sources)
+            {
+                var target = SyncStore.SafeChildFile(temporaryRoot, file.Path);
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                System.IO.File.Copy(source, target, false);
+            }
+            System.IO.File.WriteAllText(
+                Path.Combine(temporaryRoot, "manifest.json"),
+                JsonSerializer.Serialize(manifest, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+            Directory.Move(temporaryRoot, releaseRoot);
+        }
+        catch
+        {
+            if (Directory.Exists(temporaryRoot)) Directory.Delete(temporaryRoot, true);
+            throw;
+        }
+
+        var previousReleases = settings.Releases.ToList();
+        var expiredReleases = previousReleases.Skip(4).ToList();
+        try
+        {
+            SyncStore.UpdateInstance(id, false, value =>
+                value.Releases = new[] { releaseId }.Concat(previousReleases).Distinct(StringComparer.Ordinal).Take(5).ToList());
+        }
+        catch
+        {
+            if (Directory.Exists(releaseRoot)) Directory.Delete(releaseRoot, true);
+            throw;
+        }
+
+        foreach (var old in expiredReleases)
+        {
+            var oldRoot = Path.Combine(instanceReleaseRoot, old);
+            if (Directory.Exists(oldRoot)) Directory.Delete(oldRoot, true);
+        }
+        return Ok(manifest);
+    });
 
     [HttpPost("instances/{id:int}/codes")]
     public IActionResult CreateCode(int id, [FromBody] CodeRequest request)
     {
         if (global::MSLX.SDK.MSLX.Config.Servers.GetServer((uint)id) is null) return NotFound();
-        var name = string.IsNullOrWhiteSpace(request.Name) ? "未命名玩家" : request.Name.Trim();
-        if (name.Length > 64) return BadRequest("同步码备注不能超过 64 个字符");
-        var created = SyncStore.CreateCode(id, name); return Ok(new { created.model.Id, created.model.Name, created.model.InstanceId, created.model.CreatedAt, code = created.raw });
+        return CreateCodeCore(id, request);
+    }
+
+    [HttpPost("codes")]
+    public IActionResult CreateCode([FromBody] CodeRequest request)
+    {
+        if (request.InstanceId is int instanceId
+            && global::MSLX.SDK.MSLX.Config.Servers.GetServer((uint)instanceId) is null)
+            return BadRequest("实例不存在");
+        return CreateCodeCore(request.InstanceId, request);
     }
 
     [HttpGet("codes")]
-    public IActionResult Codes() => Ok(SyncStore.State.Codes
+    public IActionResult Codes() => Ok(SyncStore.GetCodes()
         .OrderByDescending(x => x.CreatedAt)
-        .Select(x => new { x.Id, x.InstanceId, x.Name, x.Enabled, x.CreatedAt }));
+        .Select(x => new { x.Id, x.InstanceId, global = x.InstanceId is null, x.Name, x.Enabled, x.CreatedAt }));
 
-    [HttpDelete("codes/{codeId}")]
+    [HttpPost("codes/{codeId}/revoke")]
     public IActionResult Revoke(string codeId)
     {
-        var code = SyncStore.State.Codes.FirstOrDefault(x => x.Id == codeId); if (code is null) return NotFound();
-        code.Enabled = false; SyncStore.Save(); return NoContent();
+        return SyncStore.RevokeCode(codeId) ? NoContent() : NotFound();
     }
 
-    public sealed record CodeRequest(string Name);
+    [HttpDelete("codes/{codeId}")]
+    public IActionResult Delete(string codeId)
+    {
+        return SyncStore.DeleteCode(codeId) ? NoContent() : NotFound();
+    }
+
+    private static IActionResult WithInstanceLock(int instanceId, Func<IActionResult> action)
+    {
+        lock (SyncStore.InstanceGate(instanceId)) return action();
+    }
+
+    private IActionResult CreateCodeCore(int? instanceId, CodeRequest request)
+    {
+        var name = string.IsNullOrWhiteSpace(request.Name) ? "未命名玩家" : request.Name.Trim();
+        if (name.Length > 64) return BadRequest("同步码备注不能超过 64 个字符");
+        var created = SyncStore.CreateCode(instanceId, name);
+        return Ok(new
+        {
+            created.model.Id,
+            created.model.Name,
+            created.model.InstanceId,
+            global = created.model.InstanceId is null,
+            created.model.CreatedAt,
+            code = created.raw
+        });
+    }
+
+    public sealed record CodeRequest(string Name, int? InstanceId = null);
 }
