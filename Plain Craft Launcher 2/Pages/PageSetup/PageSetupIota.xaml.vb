@@ -33,9 +33,10 @@ Public Class PageSetupIota
             text.Children.Add(New TextBlock With {.Text = "绑定实例 ID：" & source("instanceId")?.ToString() & "　同步码：已安全保存", .Opacity = 0.55, .FontSize = 11, .Margin = New Thickness(0, 4, 15, 0)})
             root.Children.Add(text)
             Dim buttons As New StackPanel With {.Orientation = Orientation.Horizontal, .VerticalAlignment = VerticalAlignment.Center}
-            Dim reset As New MyButton With {.Text = "重置可选项", .Padding = New Thickness(12, 6, 12, 6), .Margin = New Thickness(0, 0, 8, 0), .Tag = source("instanceId")?.ToString()}
+            Dim sourceKey = New JObject From {{"address", source("address")?.ToString()}, {"instanceId", source("instanceId")?.ToString()}}
+            Dim reset As New MyButton With {.Text = "重置可选项", .Padding = New Thickness(12, 6, 12, 6), .Margin = New Thickness(0, 0, 8, 0), .Tag = sourceKey}
             AddHandler reset.Click, AddressOf ResetOptional_Click
-            Dim remove As New MyButton With {.Text = "删除", .Padding = New Thickness(12, 6, 12, 6), .Tag = source("instanceId")?.ToString()}
+            Dim remove As New MyButton With {.Text = "删除", .Padding = New Thickness(12, 6, 12, 6), .Tag = sourceKey}
             AddHandler remove.Click, AddressOf Remove_Click
             buttons.Children.Add(reset) : buttons.Children.Add(remove) : Grid.SetColumn(buttons, 1) : root.Children.Add(buttons)
             card.Child = root : PanSources.Children.Add(card)
@@ -43,16 +44,18 @@ Public Class PageSetupIota
     End Sub
 
     Private Sub ResetOptional_Click(sender As Object, e As EventArgs)
-        Dim sources = LoadSources(), id = DirectCast(sender, MyButton).Tag.ToString()
-        For Each source In sources.OfType(Of JObject)().Where(Function(x) x("instanceId")?.ToString() = id)
+        Dim sources = LoadSources(), key = DirectCast(DirectCast(sender, MyButton).Tag, JObject)
+        Dim address = key("address")?.ToString(), id = key("instanceId")?.ToString()
+        For Each source In sources.OfType(Of JObject)().Where(Function(x) String.Equals(x("address")?.ToString(), address, StringComparison.OrdinalIgnoreCase) AndAlso x("instanceId")?.ToString() = id)
             source.Remove("optional")
         Next
         SaveSources(sources) : Hint("已重置可选内容选择！", HintType.Green)
     End Sub
 
     Private Sub Remove_Click(sender As Object, e As EventArgs)
-        Dim id = DirectCast(sender, MyButton).Tag.ToString()
+        Dim key = DirectCast(DirectCast(sender, MyButton).Tag, JObject)
+        Dim address = key("address")?.ToString(), id = key("instanceId")?.ToString()
         If MyMsgBox("确定删除这个同步源吗？本地游戏文件不会被删除。", "删除同步源", "确定", "取消", IsWarn:=True) <> 1 Then Return
-        RemoveSource(id) : RefreshSources() : Hint("同步源已删除！", HintType.Green)
+        RemoveSource(address, id) : RefreshSources() : Hint("同步源已删除！", HintType.Green)
     End Sub
 End Class

@@ -3,7 +3,7 @@ Imports System.Security.Cryptography
 Imports Newtonsoft.Json.Linq
 
 Public Module ModIotaSync
-    Public Const IotaLauncherVersion As String = "1.0.1"
+    Public Const IotaLauncherVersion As String = "1.2.2"
     Private ReadOnly ConfigPath As String = Paths.Base & "PCL\IotaSync.json"
     Private ReadOnly ConfigLock As New Object
 
@@ -43,21 +43,44 @@ Public Module ModIotaSync
         SaveSources(sources)
     End Sub
 
+    Public Sub RemoveSource(address As String, instanceId As String)
+        Dim sources = LoadSources()
+        For i = sources.Count - 1 To 0 Step -1
+            If String.Equals(sources(i)("address")?.ToString(), address, StringComparison.OrdinalIgnoreCase) AndAlso
+               sources(i)("instanceId")?.ToString() = instanceId Then sources.RemoveAt(i)
+        Next
+        SaveSources(sources)
+    End Sub
+
     Public Sub AddSourceInteractive()
-        Dim address = MyMsgBoxInput("添加同步源", "请输入 PassNat 映射地址，例如 http://example:12345", "http://", New ObjectModel.Collection(Of Validate))
+        Dim address = MyMsgBoxInput("添加同步源", "请输入同步服务根地址。支持 PassNat、FRP、端口映射、反向代理、内网地址或公网域名。", "http://", New ObjectModel.Collection(Of Validate))
         If String.IsNullOrWhiteSpace(address) Then Return
         Dim code = MyMsgBoxInput("添加同步源", "请输入长期同步码。同步码只保存在本机。", "", New ObjectModel.Collection(Of Validate))
         If String.IsNullOrWhiteSpace(code) Then Return
         Try
             address = NormalizeSourceAddress(address)
             Dim info = RequestJson(address, code, "source")
+            If info("global") IsNot Nothing AndAlso CBool(info("global")) AndAlso TypeOf info("instances") Is JArray Then
+                Dim available = DirectCast(info("instances"), JArray).OfType(Of JObject)().ToList()
+                If available.Count = 0 Then Throw New Exception("统一同步码当前没有可用的已发布实例。")
+                Dim choices As New List(Of IMyRadio)
+                For Each item In available
+                    choices.Add(New MyRadioBox With {.Text = item("instanceName").ToString()})
+                Next
+                Dim selected = MyMsgBoxSelect(choices, "选择同步服务器", "添加", "取消")
+                If selected Is Nothing Then Return
+                info = RequestJson(address, code, "source", CInt(available(selected.Value)("instanceId")))
+            End If
+            If info("instanceId") Is Nothing Then Throw New Exception("同步服务没有返回有效的服务器实例。")
+            Dim instanceId = CInt(info("instanceId"))
+            Dim manifest = RequestJson(address, code, "manifest", instanceId)
             Dim sources = LoadSources()
             For i = sources.Count - 1 To 0 Step -1
-                If sources(i)("instanceId")?.ToString() = info("instanceId")?.ToString() Then sources.RemoveAt(i)
+                If String.Equals(sources(i)("address")?.ToString(), address, StringComparison.OrdinalIgnoreCase) AndAlso
+                   sources(i)("instanceId")?.ToString() = instanceId.ToString(Globalization.CultureInfo.InvariantCulture) Then sources.RemoveAt(i)
             Next
-            sources.Add(New JObject From {{"address", address}, {"code", code}, {"instanceId", info("instanceId")}, {"instanceName", info("instanceName")}})
+            sources.Add(New JObject From {{"address", address}, {"code", code}, {"instanceId", instanceId}, {"instanceName", info("instanceName")}})
             SaveSources(sources)
-            Dim manifest = RequestJson(address, code, "manifest")
             Dim instanceName = info("instanceName").ToString(), versionFolder = McFolderSelected & "versions\" & instanceName & "\"
             If Not Directory.Exists(versionFolder) AndAlso MyMsgBox("已添加服务器：" & instanceName & vbCrLf & $"是否立即安装 Minecraft {manifest("minecraftVersion")} 与 {manifest("loader")}？", "首次安装", "立即安装", "稍后") = 1 Then
                 Dim request As New McInstallRequest With {.NewInstanceName = instanceName, .VersionFolder = versionFolder, .MinecraftName = manifest("minecraftVersion").ToString()}
@@ -87,34 +110,28 @@ Public Module ModIotaSync
     End Sub
 
     Public Sub CheckIotaLauncherUpdate()
-        Dim source = LoadSources().OfType(Of JObject)().FirstOrDefault()
-        If source Is Nothing Then Return
         Try
-            Dim info = RequestJson(source("address").ToString(), source("code").ToString(), "launcher")
-            Dim remoteVersion = info("version")?.ToString()
-            If String.IsNullOrWhiteSpace(remoteVersion) OrElse New Version(remoteVersion) <= New Version(IotaLauncherVersion) Then Return
-            If MyMsgBox($"发现 PCL IO 正式版 {remoteVersion}。" & vbCrLf & info("notes")?.ToString(), "启动器更新", "下载并重启", "稍后") <> 1 Then Return
-            Dim current = Process.GetCurrentProcess().MainModule.FileName, temp = current & ".iota-update"
+            Dim info As JObject
             Using client As New HttpClient()
-                client.DefaultRequestHeaders.Add("X-Iota-Sync-Code", source("code").ToString())
-                Using input = client.GetStreamAsync(source("address").ToString().TrimEnd("/"c) & "/api/plugins/mslx-plugin-iota-sync/sync/launcher/file").Result, output = File.Create(temp)
-                    input.CopyTo(output)
-                End Using
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("PCL-IO/" & IotaLauncherVersion)
+                info = JObject.Parse(client.GetStringAsync("https://api.github.com/repos/buziShui/iota-minecraft-sync/releases/latest").Result)
             End Using
-            If Sha256(temp) <> info("sha256").ToString() Then File.Delete(temp) : Throw New Exception("启动器更新包校验失败")
-            Dim updater = Paths.Base & "PCL\IotaUpdate.cmd"
-            File.WriteAllText(updater, "@echo off" & vbCrLf & "ping 127.0.0.1 -n 3 >nul" & vbCrLf & $"copy /y ""{temp}"" ""{current}"" >nul" & vbCrLf & $"start """" ""{current}""" & vbCrLf & "del /q ""%~f0""", Text.Encoding.Default)
-            Process.Start(New ProcessStartInfo("cmd.exe", "/c """ & updater & """") With {.CreateNoWindow = True, .WindowStyle = ProcessWindowStyle.Hidden})
-            RunInUi(Sub() Application.Current.Shutdown())
+            Dim remoteVersion = info("tag_name")?.ToString().TrimStart("v"c, "V"c)
+            If String.IsNullOrWhiteSpace(remoteVersion) OrElse New Version(remoteVersion) <= New Version(IotaLauncherVersion) Then Return
+            Dim notes = info("body")?.ToString()
+            If notes IsNot Nothing AndAlso notes.Length > 300 Then notes = notes.Substring(0, 300) & "…"
+            If MyMsgBox($"发现 PCL IO 正式版 {remoteVersion}。" & vbCrLf & notes, "启动器更新", "前往 GitHub 下载", "稍后") = 1 Then
+                OpenWebsite(If(info("html_url")?.ToString(), "https://github.com/buziShui/iota-minecraft-sync/releases/latest"))
+            End If
         Catch ex As Exception
-            Logger.Warn(ex, "检查 PCL IO 更新失败")
+            Logger.Warn(ex, "检查 GitHub 上的 PCL IO 更新失败")
         End Try
     End Sub
 
     Public Sub SyncBeforeLaunch()
         Dim source = LoadSources().OfType(Of JObject)().FirstOrDefault(Function(x) String.Equals(x("instanceName")?.ToString(), McInstanceSelected.Name, StringComparison.OrdinalIgnoreCase))
         If source Is Nothing Then Return
-        Dim manifest = RequestJson(source("address").ToString(), source("code").ToString(), "manifest")
+        Dim manifest = RequestJson(source("address").ToString(), source("code").ToString(), "manifest", CInt(source("instanceId")))
         Dim releaseId = manifest("releaseId")?.ToString()
         Dim statePath = McInstanceSelected.PathIndie & ".iota-sync-state.json"
         Dim oldState As JObject = If(File.Exists(statePath), JObject.Parse(File.ReadAllText(statePath)), New JObject From {{"files", New JObject()}})
@@ -155,10 +172,12 @@ Public Module ModIotaSync
         File.WriteAllText(statePath, (New JObject From {{"releaseId", releaseId}, {"files", newFiles}}).ToString(Newtonsoft.Json.Formatting.Indented))
     End Sub
 
-    Private Function RequestJson(address As String, code As String, endpoint As String) As JObject
+    Private Function RequestJson(address As String, code As String, endpoint As String, Optional instanceId As Integer? = Nothing) As JObject
         Using client As New HttpClient()
             client.Timeout = TimeSpan.FromSeconds(30) : client.DefaultRequestHeaders.Add("X-Iota-Sync-Code", code)
-            Dim response = client.GetAsync(address.TrimEnd("/"c) & "/api/plugins/mslx-plugin-iota-sync/sync/" & endpoint).Result
+            Dim url = address.TrimEnd("/"c) & "/api/plugins/mslx-plugin-iota-sync/sync/" & endpoint
+            If instanceId.HasValue Then url &= "?instanceId=" & instanceId.Value.ToString(Globalization.CultureInfo.InvariantCulture)
+            Dim response = client.GetAsync(url).Result
             response.EnsureSuccessStatusCode() : Return JObject.Parse(response.Content.ReadAsStringAsync().Result)
         End Using
     End Function
@@ -169,6 +188,7 @@ Public Module ModIotaSync
         Using client As New HttpClient()
             client.DefaultRequestHeaders.Add("X-Iota-Sync-Code", source("code").ToString())
             Dim url = source("address").ToString().TrimEnd("/"c) & "/api/plugins/mslx-plugin-iota-sync/sync/files/" & String.Join("/", relative.Split("/"c).Select(Function(x) Uri.EscapeDataString(x)))
+            url &= "?instanceId=" & CInt(source("instanceId")).ToString(Globalization.CultureInfo.InvariantCulture)
             Using input = client.GetStreamAsync(url).Result, output = File.Create(temp) : input.CopyTo(output) : End Using
         End Using
         If Sha256(temp) <> expected Then File.Delete(temp) : Throw New Exception("文件校验失败：" & relative)
@@ -192,7 +212,8 @@ Public Module ModIotaSync
     Private Function LoadSourcesWithReplacement(updated As JObject) As JArray
         Dim sources = LoadSources()
         For i = 0 To sources.Count - 1
-            If sources(i)("instanceId")?.ToString() = updated("instanceId")?.ToString() Then sources(i) = updated : Exit For
+            If String.Equals(sources(i)("address")?.ToString(), updated("address")?.ToString(), StringComparison.OrdinalIgnoreCase) AndAlso
+               sources(i)("instanceId")?.ToString() = updated("instanceId")?.ToString() Then sources(i) = updated : Exit For
         Next
         Return sources
     End Function
