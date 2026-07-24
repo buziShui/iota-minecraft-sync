@@ -347,8 +347,15 @@ async function saveSettings(notify: boolean, success = '实例配置已保存') 
   try {
     normalizeSettings(item.settings);
     item.settings.overrides = buildOverrides(item.settings.lastScan);
-    const saved = await request<Settings>(`${api}/instances/${item.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editableSettings(item.settings)) });
-    item.settings = normalizeInstance({ ...item, settings: saved }).settings;
+    // PUT 只保存可编辑配置。扫描结果和发布记录属于服务端维护的数据，
+    // 不应因为宿主缓存了旧前端、响应字段缺失或集合反序列化差异而被清空。
+    const lastScan = normalizeScanFiles(item.settings.lastScan);
+    const releases = [...item.settings.releases];
+    const saved = await request<Partial<Settings>>(`${api}/instances/${item.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editableSettings(item.settings)) });
+    const normalized = normalizeInstance({ ...item, settings: { ...item.settings, ...(saved || {}) } }).settings;
+    normalized.lastScan = lastScan;
+    normalized.releases = releases;
+    item.settings = normalized;
     dirty.value = false;
     if (notify) MessagePlugin.success(success);
   } catch (error) { showError(error); }
